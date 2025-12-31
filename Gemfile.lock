@@ -3,6 +3,8 @@ GEM
   specs:
     addressable (2.8.8)
       public_suffix (>= 2.0.2, < 8.0)
+    base64 (0.3.0)
+    bigdecimal (3.3.1)
     csv (3.3.5)
     domain_name (0.6.20240107)
     ffi (1.17.3)
@@ -29,8 +31,20 @@ GEM
     http-form_data (2.3.0)
     http-parser (1.2.3)
       ffi-compiler (>= 1.0, < 2.0)
+    logger (1.7.0)
+    matrix (0.4.3)
+    pdf-core (0.10.0)
+    prawn (2.5.0)
+      matrix (~> 0.4)
+      pdf-core (~> 0.10.0)
+      ttfunk (~> 1.8)
     public_suffix (7.0.0)
     rake (13.3.1)
+    ruby-vips (2.3.0)
+      ffi (~> 1.12)
+      logger
+    ttfunk (1.8.0)
+      bigdecimal (~> 3.1)
 
 PLATFORMS
   aarch64-linux-gnu
@@ -46,8 +60,11 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  base64
   csv
   http
+  prawn
+  ruby-vips
 
 BUNDLED WITH
    2.6.9

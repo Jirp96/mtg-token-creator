@@ -9,10 +9,13 @@
     - Mana colors
     - Tap
     - etc    
-- [ ] Complete token with all card info
+- [X] Complete token with all card info
     - Get all coordinates (x, y) of each data
     - Set font
     - Check for mana cost formatting
     - Format oracle text?
 
-- [ ] Save card on file
+- [X] Save card on file
+- [X] Generate PDF with cards, 3x3
+- [ ] Fix dimensions for PDF
+- [ ] Format code

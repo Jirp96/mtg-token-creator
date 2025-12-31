@@ -56,3 +56,6 @@ build-iPhoneSimulator/
 # .rubocop-https?--*
 
 cards.csv
+output/
+*.pdf
+*.png

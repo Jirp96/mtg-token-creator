@@ -3,7 +3,9 @@
 {
 	"name": "Ruby",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/ruby:2-3.4-trixie"
+	"build": {
+		"dockerfile": "Dockerfile"
+	}
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
