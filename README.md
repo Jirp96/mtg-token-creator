@@ -5,4 +5,6 @@
 
 # TODO:
 - [ ] Fix dimensions for PDF
+- [ ] Fix image formatting
+- [ ] Fix PiPs overlap with card title
 - [ ] Format code
