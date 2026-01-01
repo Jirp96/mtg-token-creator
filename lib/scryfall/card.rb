@@ -47,6 +47,10 @@ module Scryfall
       pips
     end
 
+    def raw_cost
+      mana_cost.tr("{", "").split("}").join("")
+    end
+
     def processed_name
       name.gsub(/[^\w\s_-]+/, '')
             .gsub(/(^|\b\s)\s+($|\s?\b)/, '\\1\\2')

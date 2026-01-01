@@ -1,21 +1,8 @@
-# TODO:
-- [X] Read cards from csv/yml
-- [X] Get card's information from Scryfall API
-    - Name
-    - Mana Cost
-    - Text
-    - Types
-- [ ] Get clear images for symbols/costs
-    - Mana colors
-    - Tap
-    - etc    
-- [X] Complete token with all card info
-    - Get all coordinates (x, y) of each data
-    - Set font
-    - Check for mana cost formatting
-    - Format oracle text?
+# REQUIREMENTS:
+- `bundle install`
+- MTG font by chilli-axe [link](https://github.com/chilli-axe/mtg-photoshop-automation/blob/master/fonts/NDPMTG.ttf)
+    - It should be downloaded and put in a fonts/* folder in the root of the project
 
-- [X] Save card on file
-- [X] Generate PDF with cards, 3x3
+# TODO:
 - [ ] Fix dimensions for PDF
 - [ ] Format code

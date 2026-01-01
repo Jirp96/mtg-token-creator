@@ -8,7 +8,7 @@ ORACLE_TEXT_FONT = "Sans 90"
 CARD_TYPES_FONT = "Sans Bold 80"
 CARD_TEXT_SIZE          = 2200
 CARD_TEXT_X_MARGIN      = 200
-CARD_TITLE_POSITION     = 100
+CARD_TITLE_POSITION     = 120
 CARD_TYPES_POSITION     = 1900
 CARD_STAT_LINE_X_POSITION = 2000
 CARD_STAT_LINE_Y_POSITION = 3200
@@ -17,9 +17,9 @@ CARD_ART_SIZE = 2000
 CARD_ART_X = 200
 CARD_ART_Y = 300
 
-CARD_PIPS_FONT            = "Sans 70"
+CARD_PIPS_FONT            = "NDPMTG 150"
 CARD_PIPS_X_MARGIN        = 1800
-CARD_PIPS_POSITION        = 100
+CARD_PIPS_POSITION        = 120
 
 ART_BOX = {
   width: 2100,
@@ -39,9 +39,8 @@ module ImageGeneration
     generatedCard = add_text(template, card.name, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_TITLE_POSITION)
 
     # Write Mana Cost with PIPs
-    mana_simbols = card.mana_simbols
-    #TODO: Use PIPs symbols instead of text
-    generatedCard = add_text(generatedCard, card.mana_cost, CARD_TEXT_SIZE, CARD_PIPS_X_MARGIN, CARD_PIPS_POSITION, CARD_PIPS_FONT)
+    text_to_print = card.raw_cost.downcase
+    generatedCard = add_text(generatedCard, text_to_print, CARD_TEXT_SIZE, CARD_PIPS_X_MARGIN, CARD_PIPS_POSITION, CARD_PIPS_FONT, "fonts/NDPMTG.ttf")
     
     # Write cropped card image
     if not card.is_saga 
@@ -67,14 +66,27 @@ module ImageGeneration
 
   # Add text to an image
   # Takes into account size, color, position and font
-  def self.add_text(image, text, width, x, y, font = "Sans Bold 98")
+  def self.add_text(image, text, width, x, y, font = "Sans Bold 98", fontFile = nil)
     # Create text mask
-    mask = Vips::Image.text(
-      text,
-      font: font,
-      width: width,
-      align: :low
-    )
+    mask = nil
+
+    if fontFile.nil?
+      mask = Vips::Image.text(
+        text,
+        font: font,
+        width: width,
+        align: :low
+      )
+    else
+      mask = Vips::Image.text(
+        text,
+        font: font,
+        width: width,
+        align: :low,
+        fontfile: fontFile
+      )
+    end
+    
 
     # Force single-band mask (important!)
     mask = mask.extract_band(0)

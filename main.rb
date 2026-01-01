@@ -34,7 +34,7 @@ def main()
 
   p "Generating pdf"
 
-  # Create PDF with cards ready for print
+  #Create PDF with cards ready for print
   PdfGeneration.generate(OUTPUT_IMAGES_PATH, "pdf_sheet")
 
   p "Deleting temporary images"
