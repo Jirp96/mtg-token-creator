@@ -8,3 +8,4 @@
 - [ ] Fix image formatting
 - [ ] Fix PiPs overlap with card title
 - [ ] Format code
+- [ ] Fix PDF Size (120mb for 23 images)

@@ -2,8 +2,8 @@ require "prawn"
 
 PAGE_WIDTH_RAW = 210
 PAGE_HEIGHT_RAW = 297
-CARD_WIDTH_RAW = 69
-CARD_HEIGHT_RAW = 94
+CARD_WIDTH_RAW = 63
+CARD_HEIGHT_RAW = 88
 
 module PdfGeneration
   def self.generate(cards_image_path, output_file_name)
