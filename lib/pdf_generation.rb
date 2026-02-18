@@ -16,12 +16,13 @@ module PdfGeneration
     Prawn::Document.generate(
       "#{output_file_name}.pdf",
       page_size: [page_width, page_height],
-      margin: 0
+      margin: 0,
+      compress: true
     ) do |pdf|
       x = 0
       y = page_height
 
-      Dir["#{cards_image_path}/*.png"].each_with_index do |img, i|
+      Dir["#{cards_image_path}/*.jpg"].each_with_index do |img, i|
         pdf.image img, at: [x, y], width: card_width
 
         x += card_width

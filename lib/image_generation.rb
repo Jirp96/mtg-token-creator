@@ -58,7 +58,7 @@ module ImageGeneration
     generatedCard = add_text(generatedCard, card.stat_line, CARD_TEXT_SIZE, CARD_STAT_LINE_X_POSITION, CARD_STAT_LINE_Y_POSITION)
 
     # Write to disk
-    generatedCard.write_to_file("output/#{outFileName}.png")
+    generatedCard.write_to_file("output/#{outFileName}.jpg", Q: 85, strip: true, interlace: false)
 
   end
 

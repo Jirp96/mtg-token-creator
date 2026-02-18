@@ -39,7 +39,7 @@ def main()
 
   p "Deleting temporary images"
   # Delete temporary files
-  Dir.glob("#{OUTPUT_IMAGES_PATH}/*.png").each do |file|
+  Dir.glob("#{OUTPUT_IMAGES_PATH}/*.jpg").each do |file|
     File.delete(file)
   end
 
