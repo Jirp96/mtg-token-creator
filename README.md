@@ -6,6 +6,8 @@
 # TODO:
 - [X] Fix dimensions for PDF
 - [ ] Fix image formatting
-- [ ] Fix PiPs overlap with card title
-- [ ] Format code
+- [X] Fix PiPs overlap with card title
+- [X] Fix title formatting
+- [ ] Refactor code
 - [X] Fix PDF Size (120mb for 23 images)
+- [ ] Add other types of tokens (ex: Myrkul, Lord of Bones)

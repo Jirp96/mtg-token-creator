@@ -2,6 +2,8 @@ require "net/http"
 require "uri"
 require "vips"
 
+require_relative "title_section_renderer"
+
 CARD_TEMPLATE_FILE_NAME = "card_template.png"
 
 ORACLE_TEXT_FONT = "Sans 90"
@@ -35,17 +37,15 @@ module ImageGeneration
     # Ensure template is RGBA
     template = template.bandjoin(255) if template.bands == 3
 
-    # Write Card Title/Name
-    generatedCard = add_text(template, card.name, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_TITLE_POSITION)
-
     # Write Mana Cost with PIPs
-    text_to_print = card.raw_cost.downcase
-    generatedCard = add_text(generatedCard, text_to_print, CARD_TEXT_SIZE, CARD_PIPS_X_MARGIN, CARD_PIPS_POSITION, CARD_PIPS_FONT, "fonts/NDPMTG.ttf")
+    pips_to_print = card.raw_cost.downcase
     
+    generatedCard = add_title(template, card.name, pips_to_print, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_TITLE_POSITION, CARD_PIPS_X_MARGIN, CARD_PIPS_POSITION, CARD_PIPS_FONT, "fonts/NDPMTG.ttf")
+
     # Write cropped card image
     if not card.is_saga 
       cardArtData = download_image(card.art_crop_url)
-      generatedCard = addImage(generatedCard, cardArtData, CARD_ART_SIZE, CARD_ART_X, CARD_ART_Y)
+      generatedCard = add_image(generatedCard, cardArtData, CARD_ART_SIZE, CARD_ART_X, CARD_ART_Y)
     end    
 
     # Write card types
@@ -104,7 +104,7 @@ module ImageGeneration
     )
   end
 
-  def self.addImage(image, imageBuffer, size, x, y)
+  def self.add_image(image, imageBuffer, size, x, y)
     art = Vips::Image.new_from_buffer(
       imageBuffer,
       "",
@@ -136,6 +136,23 @@ module ImageGeneration
       x: x,
       y: y
     )
+  end
+
+  def self.add_title(image, title_text, pips_text, width, x, y, pips_x, pips_y, font = "Sans Bold 98", fontFile = nil)
+    renderer = TitleSectionRenderer.new(pips_font: CARD_PIPS_FONT, pips_font_file: fontFile)
+
+    line = renderer.render(
+      card_name: title_text,
+      pips_text: pips_text
+    )
+
+    image.composite(
+      line,
+      :over,
+      x: x,
+      y: y
+    )
+
   end
 
   def self.download_image(image_url)

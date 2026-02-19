@@ -35,12 +35,12 @@ def main()
   p "Generating pdf"
 
   #Create PDF with cards ready for print
-  PdfGeneration.generate(OUTPUT_IMAGES_PATH, "pdf_sheet")
+  #PdfGeneration.generate(OUTPUT_IMAGES_PATH, "pdf_sheet")
 
   p "Deleting temporary images"
   # Delete temporary files
   Dir.glob("#{OUTPUT_IMAGES_PATH}/*.jpg").each do |file|
-    File.delete(file)
+    #File.delete(file)
   end
 
 end
