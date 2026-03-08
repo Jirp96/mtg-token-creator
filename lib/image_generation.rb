@@ -40,7 +40,7 @@ module ImageGeneration
     # Write Mana Cost with PIPs
     pips_to_print = card.raw_cost.downcase
     
-    generatedCard = add_title(template, card.name, pips_to_print, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_TITLE_POSITION, CARD_PIPS_X_MARGIN, CARD_PIPS_POSITION, CARD_PIPS_FONT, "fonts/NDPMTG.ttf")
+    generatedCard = add_title(template, card.name, pips_to_print, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_TITLE_POSITION, CARD_PIPS_FONT, "fonts/NDPMTG.ttf")
 
     # Write cropped card image
     if not card.is_saga 
@@ -138,7 +138,7 @@ module ImageGeneration
     )
   end
 
-  def self.add_title(image, title_text, pips_text, width, x, y, pips_x, pips_y, font = "Sans Bold 98", fontFile = nil)
+  def self.add_title(image, title_text, pips_text, width, x, y, font = "Sans Bold 98", fontFile = nil)
     renderer = TitleSectionRenderer.new(pips_font: CARD_PIPS_FONT, pips_font_file: fontFile)
 
     line = renderer.render(
