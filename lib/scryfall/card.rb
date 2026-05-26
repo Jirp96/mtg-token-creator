@@ -1,16 +1,16 @@
 module Scryfall
-  class Card    
+  class Card
     attr_reader :name, :mana_cost, :oracle_text, :is_legendary, :art_crop_url
     attr_accessor :power, :toughness, :is_saga
 
-    def initialize(apiCardInfo, power=nil, toughness=nil)
+    def initialize(apiCardInfo, power=nil, toughness=nil, art_crop_url=nil)
       @cardInfo     = apiCardInfo
       @name         = apiCardInfo["name"]
       @mana_cost    = apiCardInfo["mana_cost"]
       @oracle_text  = apiCardInfo["oracle_text"]
       @is_legendary = apiCardInfo["type_line"].include? "Legendary"
       @is_saga      = apiCardInfo["type_line"].include? "Saga"
-      @art_crop_url = apiCardInfo["image_uris"]["art_crop"]
+      @art_crop_url = art_crop_url || apiCardInfo["image_uris"]["art_crop"]
       @power        = if power.nil?
                         apiCardInfo["power"]
                       else
@@ -24,7 +24,7 @@ module Scryfall
                       end
     end
 
-    def type      
+    def type
       "TOKEN #{"Legendary " if @is_legendary}#{"Enchantment " if @is_saga}Creature - #{"Saga" if @is_saga} Zombie"
     end
 
