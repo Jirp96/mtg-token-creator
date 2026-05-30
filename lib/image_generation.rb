@@ -9,8 +9,9 @@ CARD_TEMPLATE_FILE_NAME = "card_template.png"
 ORACLE_TEXT_FONT = "Sans 90"
 ORACLE_SYMBOL_FONT = "NDPMTG 105"
 ORACLE_SYMBOL_FONT_FILE = "fonts/NDPMTG.ttf"
-ORACLE_LINE_GAP = 18
+ORACLE_LINE_GAP = 24
 ORACLE_TEXT_BASELINE_PREFIX = "Ag "
+ORACLE_TEXT_METRIC_SAMPLE = "#{ORACLE_TEXT_BASELINE_PREFIX}ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789,.:;()'/-"
 ORACLE_SYMBOL_HORIZONTAL_PADDING = 10
 ORACLE_SYMBOL_BASELINE_ADJUST = 0
 CARD_TYPES_FONT = "Sans Bold 80"
@@ -226,7 +227,8 @@ module ImageGeneration
     prefixed_text = "#{ORACLE_TEXT_BASELINE_PREFIX}#{text}"
     full_text = text_layer(prefixed_text, ORACLE_TEXT_FONT)
     prefix_width = oracle_baseline_prefix_width
-    full_text.crop(prefix_width, 0, full_text.width - prefix_width, full_text.height)
+    token_layer = full_text.crop(prefix_width, 0, full_text.width - prefix_width, full_text.height)
+    normalize_oracle_layer(trim_oracle_layer_horizontally(token_layer))
   end
 
   def self.oracle_baseline_prefix_width
@@ -242,20 +244,39 @@ module ImageGeneration
     color_layer.bandjoin(mask).copy(interpretation: :srgb)
   end
 
+  def self.trim_oracle_layer_horizontally(layer)
+    left, _top, width, _height = layer.extract_band(3).find_trim(background: 0)
+    return layer if width.zero?
+
+    layer.crop(left, 0, width, layer.height)
+  end
+
+  def self.normalize_oracle_layer(layer)
+    return layer if layer.height == default_oracle_line_height
+
+    return layer if layer.height > default_oracle_line_height
+
+    transparent_layer(layer.width, default_oracle_line_height).insert(
+      layer,
+      0,
+      default_oracle_line_height - layer.height
+    )
+  end
+
   def self.oracle_space_width
     @oracle_space_width ||= Vips::Image.text("n n", font: ORACLE_TEXT_FONT).width - Vips::Image.text("nn", font: ORACLE_TEXT_FONT).width
   end
 
   def self.oracle_text_visible_bottom
     @oracle_text_visible_bottom ||= begin
-      mask = Vips::Image.text("Ag", font: ORACLE_TEXT_FONT).extract_band(0)
+      mask = Vips::Image.text(ORACLE_TEXT_METRIC_SAMPLE, font: ORACLE_TEXT_FONT).extract_band(0)
       _left, top, _width, height = mask.find_trim(background: 0)
       top + height
     end
   end
 
   def self.default_oracle_line_height
-    @default_oracle_line_height ||= Vips::Image.text("Ag", font: ORACLE_TEXT_FONT).height
+    @default_oracle_line_height ||= Vips::Image.text(ORACLE_TEXT_METRIC_SAMPLE, font: ORACLE_TEXT_FONT).height
   end
 
   def self.transparent_layer(width, height)
