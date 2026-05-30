@@ -9,8 +9,8 @@
 - [X] Fix image formatting
 - [X] Fix PiPs overlap with card title
 - [X] Fix title formatting
-- [ ] Add PiPs and Symbols in Text box
-- [ ] Allow choosing printing for image
+- [X] Add PiPs and Symbols in Text box
+- [X] Allow choosing printing for image
 - [ ] Refactor code
 - [X] Fix PDF Size (120mb for 23 images)
 - [ ] Add other types of tokens (ex: Myrkul, Lord of Bones)
