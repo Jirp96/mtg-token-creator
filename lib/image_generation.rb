@@ -30,6 +30,17 @@ CARD_PIPS_FONT            = "NDPMTG 150"
 CARD_PIPS_X_MARGIN        = 1800
 CARD_PIPS_POSITION        = 120
 
+SECOND_FACE_BOX_WIDTH    = 880
+SECOND_FACE_BOX_HEIGHT   = 950
+SECOND_FACE_BOX_GAP      = 40
+SECOND_FACE_BOX_PADDING  = 25
+SECOND_FACE_BORDER       = 5
+SECOND_FACE_SEPARATOR_H  = 4
+SECOND_FACE_NAME_FONT    = "Sans Bold 64"
+SECOND_FACE_TYPE_FONT    = "Sans Bold 56"
+SECOND_FACE_ORACLE_FONT  = "Sans 70"
+SECOND_FACE_PIPS_FONT    = "NDPMTG 90"
+
 # Scryfall art_crop images for regular cards use a 626x457 aspect ratio.
 CARD_ART_WIDTH = 2100
 CARD_ART_HEIGHT = (CARD_ART_WIDTH * 457.0 / 626).round
@@ -58,7 +69,14 @@ module ImageGeneration
     generatedCard = add_text(generatedCard, card.type, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_TYPES_POSITION, CARD_TYPES_FONT)
 
     # Write card oracle text
-    generatedCard = add_oracle_text(generatedCard, card.oracle_text, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_ORACLE_TEXT_POSITION)
+    if card.second_face
+      main_w = CARD_TEXT_SIZE - SECOND_FACE_BOX_WIDTH - SECOND_FACE_BOX_GAP
+      generatedCard = add_oracle_text(generatedCard, card.oracle_text, main_w, CARD_TEXT_X_MARGIN, CARD_ORACLE_TEXT_POSITION)
+      second_face_box = render_second_face_box(card.second_face, SECOND_FACE_BOX_WIDTH, SECOND_FACE_BOX_HEIGHT)
+      generatedCard = generatedCard.composite(second_face_box, :over, x: CARD_TEXT_X_MARGIN + main_w + SECOND_FACE_BOX_GAP, y: CARD_ORACLE_TEXT_POSITION)
+    else
+      generatedCard = add_oracle_text(generatedCard, card.oracle_text, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_ORACLE_TEXT_POSITION)
+    end
 
     # Write P/T
     generatedCard = add_text(generatedCard, card.stat_line, CARD_TEXT_SIZE, CARD_STAT_LINE_X_POSITION, CARD_STAT_LINE_Y_POSITION)
@@ -344,6 +362,57 @@ module ImageGeneration
       y: y
     )
 
+  end
+
+  def self.render_second_face_box(second_face, width, height)
+    pad     = SECOND_FACE_BOX_PADDING
+    x_start = SECOND_FACE_BORDER + pad
+    inner_w = width - x_start - pad
+
+    bg = Vips::Image.black(width, height)
+           .new_from_image([30, 60, 120, 255])
+           .copy(interpretation: :srgb)
+    bg = bg.composite(
+      Vips::Image.black(width - SECOND_FACE_BORDER * 2, height - SECOND_FACE_BORDER * 2)
+                .new_from_image([205, 220, 240, 255])
+                .copy(interpretation: :srgb),
+      :over, x: SECOND_FACE_BORDER, y: SECOND_FACE_BORDER
+    )
+
+    y = SECOND_FACE_BORDER + pad
+
+    name_text = second_face["name"] || ""
+    bg = add_text(bg, name_text, inner_w - 150, x_start, y, SECOND_FACE_NAME_FONT)
+
+    mana_cost_str = (second_face["mana_cost"] || "").tr("{", "").split("}").join("").downcase
+    unless mana_cost_str.empty?
+      pips = text_layer(mana_cost_str, SECOND_FACE_PIPS_FONT, ORACLE_SYMBOL_FONT_FILE)
+      bg = bg.composite(pips, :over, x: width - SECOND_FACE_BORDER - pad - pips.width, y: y)
+    end
+
+    y += Vips::Image.text(name_text.empty? ? " " : name_text, font: SECOND_FACE_NAME_FONT).height + pad
+
+    bg = draw_second_face_separator(bg, x_start, y, inner_w)
+    y += SECOND_FACE_SEPARATOR_H + pad
+
+    type_text = second_face["type_line"] || ""
+    bg = add_text(bg, type_text, inner_w, x_start, y, SECOND_FACE_TYPE_FONT)
+    y += Vips::Image.text(type_text.empty? ? " " : type_text, font: SECOND_FACE_TYPE_FONT).height + pad
+
+    bg = draw_second_face_separator(bg, x_start, y, inner_w)
+    y += SECOND_FACE_SEPARATOR_H + pad
+
+    oracle_text = second_face["oracle_text"] || ""
+    bg = add_text(bg, oracle_text, inner_w, x_start, y, SECOND_FACE_ORACLE_FONT) unless oracle_text.empty?
+
+    bg
+  end
+
+  def self.draw_second_face_separator(image, x, y, width)
+    sep = Vips::Image.black(width, SECOND_FACE_SEPARATOR_H)
+            .new_from_image([30, 60, 120, 255])
+            .copy(interpretation: :srgb)
+    image.composite(sep, :over, x: x, y: y)
   end
 
   def self.download_image(image_url)

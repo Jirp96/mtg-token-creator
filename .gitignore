@@ -60,3 +60,4 @@ output/
 *.pdf
 *.png
 fonts/*
+.claude/

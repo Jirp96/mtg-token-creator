@@ -1,27 +1,26 @@
 module Scryfall
   class Card
-    attr_reader :name, :mana_cost, :oracle_text, :is_legendary, :art_crop_url
+    attr_reader :name, :mana_cost, :oracle_text, :is_legendary, :art_crop_url, :second_face
     attr_accessor :power, :toughness, :is_saga
 
     def initialize(apiCardInfo, power=nil, toughness=nil, art_crop_url=nil)
-      @cardInfo     = apiCardInfo
-      @name         = apiCardInfo["name"]
-      @mana_cost    = apiCardInfo["mana_cost"]
-      @oracle_text  = apiCardInfo["oracle_text"]
-      @is_legendary = apiCardInfo["type_line"].include? "Legendary"
-      @is_saga      = apiCardInfo["type_line"].include? "Saga"
-      @art_crop_url = art_crop_url || apiCardInfo["image_uris"]["art_crop"]
-      @power        = if power.nil?
-                        apiCardInfo["power"]
-                      else
-                        power
-                      end
+      @cardInfo = apiCardInfo
 
-      @toughness    = if toughness.nil?
-                        apiCardInfo["toughness"]
-                      else
-                        toughness
-                      end
+      prepared  = (apiCardInfo["keywords"] || []).any? { |k| k.casecmp?("prepared") }
+      face      = prepared ? (apiCardInfo.dig("card_faces", 0) || apiCardInfo) : apiCardInfo
+
+      @name         = face["name"]
+      @mana_cost    = face["mana_cost"]
+      @oracle_text  = face["oracle_text"]
+      type_line     = apiCardInfo["type_line"] || apiCardInfo.dig("card_faces", 0, "type_line") || ""
+      @is_legendary = type_line.include?("Legendary")
+      @is_saga      = type_line.include?("Saga")
+      @art_crop_url = art_crop_url ||
+                      apiCardInfo.dig("image_uris", "art_crop") ||
+                      apiCardInfo.dig("card_faces", 0, "image_uris", "art_crop")
+      @second_face  = prepared ? apiCardInfo.dig("card_faces", 1) : nil
+      @power        = power.nil? ? apiCardInfo["power"] : power
+      @toughness    = toughness.nil? ? apiCardInfo["toughness"] : toughness
     end
 
     def type
