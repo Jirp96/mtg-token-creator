@@ -69,6 +69,17 @@ RSpec.describe ImageGeneration do
       expect(output.height).to eq(template.height)
     end
 
+    it "still renders a correctly-sized card when the art download fails" do
+      stub_request(:get, "https://stub.example/art").to_return(status: 500)
+
+      expect { described_class.generate(fixture_card) }
+        .to output(/Could not download art/).to_stderr
+
+      output = Vips::Image.new_from_file("output/grave_titan.jpg")
+      template = Vips::Image.new_from_file(Layout::CARD_TEMPLATE_FILE_NAME)
+      expect([output.width, output.height]).to eq([template.width, template.height])
+    end
+
     it "produces output that matches the golden reference image within tolerance" do
       described_class.generate(fixture_card)
 

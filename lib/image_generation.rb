@@ -1,3 +1,4 @@
+require "fileutils"
 require "net/http"
 require "uri"
 require "vips"
@@ -16,16 +17,33 @@ module ImageGeneration
   include Layout
   extend VipsHelpers
 
+  OUTPUT_DIR = "output".freeze
+
+  # Art download is best-effort: time out, retry a couple of times, and on
+  # failure fall back to a card with no art rather than aborting the batch.
+  ART_DOWNLOAD_TIMEOUT = 15 # seconds
+  ART_DOWNLOAD_RETRIES = 2
+
   def self.generate(card)
     image = load_template
     image = add_title(image, card.name, card.raw_cost.downcase, CARD_ART_WIDTH, CARD_TITLE_X, CARD_TITLE_POSITION, ORACLE_SYMBOL_FONT_FILE)
 
-    image = add_image(image, download_image(card.art_crop_url), CARD_ART_X, CARD_ART_Y) unless card.saga?
+    image = add_art(image, card) unless card.saga?
     image = add_text(image, card.type, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_TYPES_POSITION, CARD_TYPES_FONT)
     image = add_oracle_section(image, card)
     image = add_text(image, card.stat_line, CARD_TEXT_SIZE, CARD_STAT_LINE_X_POSITION, CARD_STAT_LINE_Y_POSITION)
 
-    image.write_to_file("output/#{card.processed_name}.jpg", Q: 85, strip: true, interlace: false)
+    FileUtils.mkdir_p(OUTPUT_DIR)
+    image.write_to_file("#{OUTPUT_DIR}/#{card.processed_name}.jpg", Q: 85, strip: true, interlace: false)
+  end
+
+  # Composite the card art, skipping it (with a warning already logged) when the
+  # download fails so a single bad image doesn't sink the whole sheet.
+  def self.add_art(image, card)
+    art_data = download_image(card.art_crop_url)
+    return image if art_data.nil?
+
+    add_image(image, art_data, CARD_ART_X, CARD_ART_Y)
   end
 
   def self.load_template
@@ -78,7 +96,31 @@ module ImageGeneration
   end
 
   def self.download_image(image_url)
-    Net::HTTP.get(URI(image_url))
+    return nil if image_url.to_s.empty?
+
+    uri = URI(image_url)
+    http_options = {
+      use_ssl: uri.scheme == "https",
+      open_timeout: ART_DOWNLOAD_TIMEOUT,
+      read_timeout: ART_DOWNLOAD_TIMEOUT
+    }
+    retries = 0
+
+    begin
+      Net::HTTP.start(uri.hostname, uri.port, **http_options) do |http|
+        response = http.request(Net::HTTP::Get.new(uri))
+        return response.body if response.is_a?(Net::HTTPSuccess)
+
+        warn "Could not download art from #{image_url} (HTTP #{response.code}). Rendering without art."
+        return nil
+      end
+    rescue StandardError => e
+      retries += 1
+      retry if retries <= ART_DOWNLOAD_RETRIES
+
+      warn "Could not download art from #{image_url}: #{e.message}. Rendering without art."
+      nil
+    end
   end
 
   # Reused across cards; the cached font metrics inside depend only on fonts.

@@ -9,6 +9,9 @@ require_relative "lib/pdf_generation"
 # Reads card names (and optional art selectors) from a CSV, fetches each card
 # from Scryfall, renders a token image, and assembles a printable PDF sheet.
 class TokenCreator
+  # Raised when the CLI is invoked without the required CSV argument.
+  class UsageError < StandardError; end
+
   NAME_COLUMN         = 0
   ART_SELECTOR_COLUMN = 1
   OUTPUT_IMAGES_PATH  = "./output"
@@ -22,7 +25,7 @@ class TokenCreator
   end
 
   def run(argv)
-    raise StandardError unless argv.length.positive? # TODO: Custom error
+    raise UsageError, "Usage: ruby main.rb <cards.csv>" if argv.empty?
 
     cards = load_cards(argv[0])
     render_images(cards)
@@ -73,7 +76,11 @@ class TokenCreator
 
   def delete_temporary_images
     log "Deleting temporary images"
-    Dir.glob("#{OUTPUT_IMAGES_PATH}/*.jpg").each { |file| File.delete(file) }
+    Dir.glob("#{OUTPUT_IMAGES_PATH}/*.jpg").each do |file|
+      File.delete(file)
+    rescue StandardError => e
+      warn "Could not delete temporary image #{file}: #{e.message}."
+    end
   end
 
   def resolve_art_crop_url(card_info, art_selector)
@@ -126,4 +133,10 @@ class TokenCreator
   end
 end
 
-TokenCreator.run(ARGV) if __FILE__ == $PROGRAM_NAME
+if __FILE__ == $PROGRAM_NAME
+  begin
+    TokenCreator.run(ARGV)
+  rescue TokenCreator::UsageError => e
+    abort e.message
+  end
+end
