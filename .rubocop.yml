@@ -1,0 +1,26 @@
+plugins:
+  - rubocop-rspec
+
+AllCops:
+  TargetRubyVersion: 3.4
+  NewCops: enable
+  Exclude:
+    - "vendor/**/*"
+    - "output/**/*"
+
+inherit_from: .rubocop_todo.yml
+
+# This project renders pixel-precise card layouts, so it carries a large number
+# of intentional numeric layout constants. Documenting every one is noise.
+Style/Documentation:
+  Enabled: false
+
+# Layout constants and vips coordinates are inherently "magic"; we centralise
+# them in lib/layout.rb rather than annotating each literal.
+Style/NumericLiterals:
+  Enabled: false
+
+# Keep string literals relaxed; the codebase mixes them and frozen-string
+# pragmas are added per file.
+Style/FrozenStringLiteralComment:
+  Enabled: false
