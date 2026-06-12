@@ -1,4 +1,8 @@
+require_relative "vips_helpers"
+
 class TitleSectionRenderer
+  include VipsHelpers
+
   DEFAULT_PADDING = 150
   DEFAULT_GAP     = 80
 
@@ -76,9 +80,5 @@ class TitleSectionRenderer
 
   def transparent_canvas(width, height)
     Vips::Image.black(width, height).new_from_image([255, 255, 255])
-  end
-
-  def vertical_center(container_h, element_h)
-    (container_h - element_h) / 2
   end
 end

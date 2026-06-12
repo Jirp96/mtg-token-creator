@@ -31,3 +31,14 @@ Style/StringLiterals:
 
 Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
+
+# x/y are the conventional names for pixel coordinates throughout the renderers.
+Naming/MethodParameterName:
+  AllowedNames:
+    - x
+    - y
+
+# Comparable#clamp raises when min > max; the explicit [[v, lo].max, hi].min
+# form used for symbol placement degrades gracefully instead, so keep it.
+Style/ComparableClamp:
+  Enabled: false
