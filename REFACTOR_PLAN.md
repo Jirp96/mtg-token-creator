@@ -136,13 +136,26 @@ docker exec mtg-dev bash -lc 'export PATH="/home/vscode/.local/share/mise/shims:
 
 ---
 
-## Progress so far (Phase 0 scaffolding already in place)
+## Progress — all phases complete
 
-> The following were created while validating this plan and can be kept or reverted.
+Implemented on branch `refactor/quality-cleanup`, one commit per phase, each
+verified green via `bundle exec rake` (RuboCop clean + RSpec) in the `mtg-dev`
+Docker container (Ruby 3.4.9 + libvips). The golden-image spec matched after
+every phase, confirming pixel-equivalent output.
 
-- ✅ Dockerized dev env verified (Ruby 3.4.9 + ruby-vips 2.3.0 in the `mtg-dev` container).
-- ✅ `.ruby-version` (3.4.9) and `Gemfile` `ruby` directive + `development, :test` group (`rake`, `rspec`, `rubocop`, `rubocop-rspec`, `webmock`); `bundle install` succeeds.
-- ✅ `.rubocop.yml`, `Rakefile`, `spec/spec_helper.rb`.
-- ✅ `spec/scryfall/card_spec.rb` — **16 examples, 0 failures** against current code.
-- ✅ `spec/scryfall/cards_spec.rb` (WebMock) and `spec/pdf_generation_spec.rb` written (not yet run).
-- ⏳ Remaining Phase 0: run cards/pdf specs, generate `.rubocop_todo.yml` baseline, author the golden-image spec + capture the golden reference, add the CI workflow, and `.gitignore` `vendor/`.
+- ✅ **Phase 0** — safety net: `.ruby-version`, dev/test Gemfile group, `.rubocop.yml`
+  + `.rubocop_todo.yml`, `Rakefile`, `spec/` (Card, Cards/WebMock, PDF, and the
+  golden-image characterization specs), CI workflow, pruned `.gitignore`.
+- ✅ **Phase 1** — `lib/layout.rb` centralizes all magic numbers/fonts/colors;
+  PDF + Scryfall constants namespaced; dead code removed.
+- ✅ **Phase 2** — god module split into `vips_helpers`, `oracle_text_renderer`
+  (instance-owned metric cache), `second_face_renderer`; `image_generation.rb`
+  is now a 92-line orchestrator (was 421).
+- ✅ **Phase 3** — `TokenCreator` class + `__FILE__` guard, snake_case throughout,
+  `legendary?`/`saga?` predicates, `log`/`blank?` helpers, deduped mana stripping.
+- ✅ **Phase 4** — `UsageError`, resilient art download (timeout/retry/skip),
+  output-dir creation, guarded cleanup; spec for the no-art fallback.
+- ✅ **Phase 5** — rewritten README, CI font fetch, tightened lint baseline (only
+  the vips `Image#insert` false positives and one layout preference remain).
+
+Final: **35 examples, 0 failures; RuboCop clean.**
