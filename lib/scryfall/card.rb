@@ -31,29 +31,14 @@ module Scryfall
       "#{@power}/#{@toughness}"
     end
 
-    def mana_simbols
-      pips = {"colorless": 0, "W": 0, "U": 0, "R":0, "B": 0, "G": 0, "X": 0}
-      cost_list = mana_cost.tr("{", "").split("}")
-
-      cost_list.each do |pip|
-        if "WURBGX".include? pip
-          pips[pip.to_sym] += 1
-        else
-          pips[:colorless] += 1
-        end
-      end
-
-      pips
-    end
-
     def raw_cost
       mana_cost.tr("{", "").split("}").join("")
     end
 
     def processed_name
-      name.to_s.gsub(/[^\w\s_-]+/, '')
+      name.to_s.gsub(/[^\w\s_-]+/, "")
             .gsub(/(^|\b\s)\s+($|\s?\b)/, '\\1\\2')
-            .gsub(/\s+/, '_')
+            .gsub(/\s+/, "_")
             .downcase
     end
 

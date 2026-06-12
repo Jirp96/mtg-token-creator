@@ -1,11 +1,11 @@
 require "http"
 require "uri"
 
-CARD_API_URL = "https://api.scryfall.com/cards/named"
-CARD_PRINT_API_URL = "https://api.scryfall.com/cards"
-
 module Scryfall
   class Cards
+    CARD_API_URL = "https://api.scryfall.com/cards/named"
+    CARD_PRINT_API_URL = "https://api.scryfall.com/cards"
+
     def self.get(name)
       request(CARD_API_URL, params: {exact: name})
     end

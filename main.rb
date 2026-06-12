@@ -8,7 +8,6 @@ require_relative "lib/pdf_generation"
 
 NAME_COLUMN = 0
 ART_SELECTOR_COLUMN = 1
-SCRYFALL_URL = ""
 OUTPUT_IMAGES_PATH = "./output"
 
 def csv_value(row, column)
