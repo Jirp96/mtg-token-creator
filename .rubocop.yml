@@ -24,3 +24,10 @@ Style/NumericLiterals:
 # pragmas are added per file.
 Style/FrozenStringLiteralComment:
   Enabled: false
+
+# The codebase consistently uses double-quoted strings (matching QuotedSymbols).
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes

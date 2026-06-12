@@ -63,7 +63,7 @@ RSpec.describe ImageGeneration do
       described_class.generate(fixture_card)
 
       output = Vips::Image.new_from_file("output/grave_titan.jpg")
-      template = Vips::Image.new_from_file(CARD_TEMPLATE_FILE_NAME)
+      template = Vips::Image.new_from_file(Layout::CARD_TEMPLATE_FILE_NAME)
 
       expect(output.width).to eq(template.width)
       expect(output.height).to eq(template.height)

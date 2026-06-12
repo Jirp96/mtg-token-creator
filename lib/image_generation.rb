@@ -2,50 +2,12 @@ require "net/http"
 require "uri"
 require "vips"
 
+require_relative "layout"
 require_relative "title_section_renderer"
 
-CARD_TEMPLATE_FILE_NAME = "card_template.png"
-
-ORACLE_TEXT_FONT = "Sans 90"
-ORACLE_SYMBOL_FONT = "NDPMTG 105"
-ORACLE_SYMBOL_FONT_FILE = "fonts/NDPMTG.ttf"
-ORACLE_LINE_GAP = 24
-ORACLE_TEXT_BASELINE_PREFIX = "Ag "
-ORACLE_TEXT_METRIC_SAMPLE = "#{ORACLE_TEXT_BASELINE_PREFIX}ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789,.:;()'/-"
-ORACLE_SYMBOL_HORIZONTAL_PADDING = 10
-ORACLE_SYMBOL_BASELINE_ADJUST = 0
-CARD_TYPES_FONT = "Sans Bold 80"
-CARD_TEXT_SIZE          = 2200
-CARD_TEXT_X_MARGIN      = 200
-CARD_TITLE_POSITION     = 120
-CARD_TYPES_POSITION     = 1900
-CARD_STAT_LINE_X_POSITION = 2000
-CARD_STAT_LINE_Y_POSITION = 3200
-CARD_ORACLE_TEXT_POSITION = 2200
-CARD_ART_X = 200
-CARD_ART_Y = 300
-CARD_TITLE_X = CARD_ART_X
-
-CARD_PIPS_FONT            = "NDPMTG 150"
-CARD_PIPS_X_MARGIN        = 1800
-CARD_PIPS_POSITION        = 120
-
-SECOND_FACE_BOX_WIDTH    = 880
-SECOND_FACE_BOX_HEIGHT   = 950
-SECOND_FACE_BOX_GAP      = 40
-SECOND_FACE_BOX_PADDING  = 25
-SECOND_FACE_BORDER       = 5
-SECOND_FACE_SEPARATOR_H  = 4
-SECOND_FACE_NAME_FONT    = "Sans Bold 64"
-SECOND_FACE_TYPE_FONT    = "Sans Bold 56"
-SECOND_FACE_ORACLE_FONT  = "Sans 70"
-SECOND_FACE_PIPS_FONT    = "NDPMTG 90"
-
-# Scryfall art_crop images for regular cards use a 626x457 aspect ratio.
-CARD_ART_WIDTH = 2100
-CARD_ART_HEIGHT = (CARD_ART_WIDTH * 457.0 / 626).round
-
 module ImageGeneration
+  include Layout
+
   def self.generate(card)
     outFileName = card.processed_name
 
@@ -91,31 +53,13 @@ module ImageGeneration
   # Add text to an image
   # Takes into account size, color, position and font
   def self.add_text(image, text, width, x, y, font = "Sans Bold 98", fontFile = nil)
-    # Create text mask
-    mask = nil
-
-    if fontFile.nil?
-      mask = Vips::Image.text(
-        text,
-        font: font,
-        width: width,
-        align: :low
-      )
-    else
-      mask = Vips::Image.text(
-        text,
-        font: font,
-        width: width,
-        align: :low,
-        fontfile: fontFile
-      )
-    end
-    
+    options = { font: font, width: width, align: :low }
+    options[:fontfile] = fontFile unless fontFile.nil?
 
     # Force single-band mask (important!)
-    mask = mask.extract_band(0)
+    mask = Vips::Image.text(text, **options).extract_band(0)
 
-    color_layer = image.new_from_image([0, 0, 0])
+    color_layer = image.new_from_image(TEXT_BLACK)
     text = color_layer.crop(0, 0, mask.width, mask.height)
     text = text.bandjoin(mask)
 
@@ -258,7 +202,7 @@ module ImageGeneration
     options[:fontfile] = font_file unless font_file.nil?
 
     mask = Vips::Image.text(text, **options).extract_band(0)
-    color_layer = mask.new_from_image([0, 0, 0])
+    color_layer = mask.new_from_image(TEXT_BLACK)
     color_layer.bandjoin(mask).copy(interpretation: :srgb)
   end
 
@@ -370,11 +314,11 @@ module ImageGeneration
     inner_w = width - x_start - pad
 
     bg = Vips::Image.black(width, height)
-           .new_from_image([30, 60, 120, 255])
+           .new_from_image(SECOND_FACE_BORDER_COLOR)
            .copy(interpretation: :srgb)
     bg = bg.composite(
       Vips::Image.black(width - SECOND_FACE_BORDER * 2, height - SECOND_FACE_BORDER * 2)
-                .new_from_image([205, 220, 240, 255])
+                .new_from_image(SECOND_FACE_BG_COLOR)
                 .copy(interpretation: :srgb),
       :over, x: SECOND_FACE_BORDER, y: SECOND_FACE_BORDER
     )
@@ -410,7 +354,7 @@ module ImageGeneration
 
   def self.draw_second_face_separator(image, x, y, width)
     sep = Vips::Image.black(width, SECOND_FACE_SEPARATOR_H)
-            .new_from_image([30, 60, 120, 255])
+            .new_from_image(SECOND_FACE_BORDER_COLOR)
             .copy(interpretation: :srgb)
     image.composite(sep, :over, x: x, y: y)
   end
