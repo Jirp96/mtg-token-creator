@@ -59,8 +59,12 @@ module Scryfall
       !parse_scryfall_card_url(value).nil?
     end
 
+    # Scryfall allows up to 10 req/s (100ms per request). We add 20ms of
+    # headroom to stay safely within the limit. Override with SCRYFALL_DELAY=<seconds>.
+    REQUEST_DELAY = ENV.fetch("SCRYFALL_DELAY", 0.12).to_f
+
     def self.request(url, params: nil)
-      sleep(0.1)
+      sleep(REQUEST_DELAY)
       HTTP["accept": "application/json", "User-Agent": "Hashaton-Token-Maker"]
         .get(url, params: params)
     end

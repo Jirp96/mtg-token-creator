@@ -1,4 +1,5 @@
 #!/usr/bin/ruby
+require "bundler/setup"
 require "csv"
 
 require_relative "lib/scryfall"
@@ -64,14 +65,21 @@ def main()
     cardName = csv_value(row, NAME_COLUMN)
     next if cardName.nil? || cardName.empty?
 
+    p "Processing '#{cardName}'"
     artSelector = csv_value(row, ART_SELECTOR_COLUMN)
     cardApiResponse = Scryfall::Cards.get(cardName)
+    abort "Scryfall rate limit exceeded while fetching '#{cardName}'. Wait a moment and try again." if cardApiResponse.status.code == 429
+    unless cardApiResponse.status.success?
+      warn "Scryfall could not find '#{cardName}' (HTTP #{cardApiResponse.status.code}). Skipping."
+      next
+    end
+
     cardInfo = cardApiResponse.parse
     artCropUrl = resolve_art_crop_url(cardInfo, artSelector)
 
     cardData = Scryfall::Card.new(cardInfo, 4, 4, artCropUrl)
 
-    cards.append(cardData)
+    cards << cardData
   end
 
   p "Generating images"

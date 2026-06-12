@@ -51,7 +51,7 @@ module Scryfall
     end
 
     def processed_name
-      name.gsub(/[^\w\s_-]+/, '')
+      name.to_s.gsub(/[^\w\s_-]+/, '')
             .gsub(/(^|\b\s)\s+($|\s?\b)/, '\\1\\2')
             .gsub(/\s+/, '_')
             .downcase
