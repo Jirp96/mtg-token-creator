@@ -20,7 +20,7 @@ module ImageGeneration
     image = load_template
     image = add_title(image, card.name, card.raw_cost.downcase, CARD_ART_WIDTH, CARD_TITLE_X, CARD_TITLE_POSITION, ORACLE_SYMBOL_FONT_FILE)
 
-    image = add_image(image, download_image(card.art_crop_url), CARD_ART_X, CARD_ART_Y) unless card.is_saga
+    image = add_image(image, download_image(card.art_crop_url), CARD_ART_X, CARD_ART_Y) unless card.saga?
     image = add_text(image, card.type, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_TYPES_POSITION, CARD_TYPES_FONT)
     image = add_oracle_section(image, card)
     image = add_text(image, card.stat_line, CARD_TEXT_SIZE, CARD_STAT_LINE_X_POSITION, CARD_STAT_LINE_Y_POSITION)

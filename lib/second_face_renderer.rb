@@ -1,6 +1,7 @@
 require "vips"
 
 require_relative "vips_helpers"
+require_relative "scryfall/card"
 
 # Renders the inset "second face" box used by prepared double-faced tokens:
 # a bordered panel with name + mana cost, type line, and oracle text, separated
@@ -54,12 +55,12 @@ class SecondFaceRenderer
                .composite(inner, :over, x: SECOND_FACE_BORDER, y: SECOND_FACE_BORDER)
   end
 
-  def composite_mana_cost(bg, mana_cost, width, pad, y)
-    cost = (mana_cost || "").tr("{", "").split("}").join.downcase
-    return bg if cost.empty?
+  def composite_mana_cost(image, mana_cost, width, pad, y)
+    cost = Scryfall::Card.strip_mana_cost(mana_cost).downcase
+    return image if cost.empty?
 
     pips = text_layer(cost, SECOND_FACE_PIPS_FONT, ORACLE_SYMBOL_FONT_FILE)
-    bg.composite(pips, :over, x: width - SECOND_FACE_BORDER - pad - pips.width, y: y)
+    image.composite(pips, :over, x: width - SECOND_FACE_BORDER - pad - pips.width, y: y)
   end
 
   # Move the y cursor past a line of `text` rendered in `font`, plus padding.

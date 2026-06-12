@@ -39,8 +39,8 @@ RSpec.describe Scryfall::Card do
       saga = plain_creature.merge("type_line" => "Enchantment — Saga")
       card = described_class.new(saga)
 
-      expect(card.is_legendary).to be(false)
-      expect(card.is_saga).to be(true)
+      expect(card.legendary?).to be(false)
+      expect(card.saga?).to be(true)
       expect(card.type).to eq("TOKEN Enchantment Creature - Saga Zombie")
     end
 
