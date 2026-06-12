@@ -43,9 +43,9 @@ module Scryfall
 
     def processed_name
       name.to_s.gsub(/[^\w\s_-]+/, "")
-            .gsub(/(^|\b\s)\s+($|\s?\b)/, '\\1\\2')
-            .gsub(/\s+/, "_")
-            .downcase
+          .gsub(/(^|\b\s)\s+($|\s?\b)/, '\\1\\2')
+          .gsub(/\s+/, "_")
+          .downcase
     end
 
     # Strip the {…} delimiters from a Scryfall mana-cost string,
