@@ -14,8 +14,8 @@ class TokenCreator
 
   NAME_COLUMN         = 0
   ART_SELECTOR_COLUMN = 1
-  OUTPUT_IMAGES_PATH  = "./output"
-  PDF_FILE_NAME       = "pdf_sheet"
+  OUTPUT_IMAGES_PATH  = "./output".freeze
+  PDF_FILE_NAME       = "pdf_sheet".freeze
   DEFAULT_POWER       = 4
   DEFAULT_TOUGHNESS   = 4
   RATE_LIMIT_STATUS   = 429
@@ -98,8 +98,8 @@ class TokenCreator
 
     warn "Could not find selected art for #{card_info["name"]} using '#{art_selector}'. Using default art."
     nil
-  rescue StandardError => error
-    warn "Could not find selected art for #{card_info["name"]} using '#{art_selector}': #{error.message}. Using default art."
+  rescue StandardError => e
+    warn "Could not find selected art for #{card_info["name"]} using '#{art_selector}': #{e.message}. Using default art."
     nil
   end
 

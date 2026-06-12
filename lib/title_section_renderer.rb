@@ -52,9 +52,7 @@ class TitleSectionRenderer
     pips_y = vertical_center(height, pips_img.height)
 
     title_bar = title_bar.insert(name_img, name_x, name_y)
-    title_bar = title_bar.insert(pips_img, pips_x, pips_y)
-
-    title_bar
+    title_bar.insert(pips_img, pips_x, pips_y)
   end
 
   private
@@ -69,7 +67,7 @@ class TitleSectionRenderer
   def render_text_custom_font(text, font, font_file)
     Vips::Image.text(
       text,
-      font: "#{font}",
+      font: font,
       fontfile: font_file
     )
   end

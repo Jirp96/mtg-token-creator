@@ -3,11 +3,11 @@ require "uri"
 
 module Scryfall
   class Cards
-    CARD_API_URL = "https://api.scryfall.com/cards/named"
-    CARD_PRINT_API_URL = "https://api.scryfall.com/cards"
+    CARD_API_URL = "https://api.scryfall.com/cards/named".freeze
+    CARD_PRINT_API_URL = "https://api.scryfall.com/cards".freeze
 
     def self.get(name)
-      request(CARD_API_URL, params: {exact: name})
+      request(CARD_API_URL, params: { exact: name })
     end
 
     def self.get_print_from_uri(prints_search_uri, set_code)
@@ -65,7 +65,7 @@ module Scryfall
 
     def self.request(url, params: nil)
       sleep(REQUEST_DELAY)
-      HTTP["accept": "application/json", "User-Agent": "Hashaton-Token-Maker"]
+      HTTP[accept: "application/json", "User-Agent": "Hashaton-Token-Maker"]
         .get(url, params: params)
     end
   end

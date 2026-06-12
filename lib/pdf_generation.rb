@@ -8,7 +8,6 @@ module PdfGeneration
   CARD_HEIGHT_RAW = 88
 
   def self.generate(cards_image_path, output_file_name)
-    
     page_width = mm_to_pt(PAGE_WIDTH_RAW)
     page_height = mm_to_pt(PAGE_HEIGHT_RAW)
     card_width = mm_to_pt(CARD_WIDTH_RAW)
@@ -23,7 +22,7 @@ module PdfGeneration
       x = 0
       y = page_height
 
-      Dir["#{cards_image_path}/*.jpg"].each_with_index do |img, i|
+      Dir["#{cards_image_path}/*.jpg"].each do |img|
         pdf.image img, at: [x, y], width: card_width
 
         x += card_width
