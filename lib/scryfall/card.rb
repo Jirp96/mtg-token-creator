@@ -1,30 +1,36 @@
 module Scryfall
   class Card
-    attr_reader :name, :mana_cost, :oracle_text, :is_legendary, :art_crop_url, :second_face
-    attr_accessor :power, :toughness, :is_saga
+    attr_reader :name, :mana_cost, :oracle_text, :art_crop_url, :second_face
+    attr_accessor :power, :toughness
 
-    def initialize(apiCardInfo, power=nil, toughness=nil, art_crop_url=nil)
-      @cardInfo = apiCardInfo
+    def initialize(api_card_info, power = nil, toughness = nil, art_crop_url = nil)
+      prepared = (api_card_info["keywords"] || []).any? { |k| k.casecmp?("prepared") }
+      face     = prepared ? (api_card_info.dig("card_faces", 0) || api_card_info) : api_card_info
 
-      prepared  = (apiCardInfo["keywords"] || []).any? { |k| k.casecmp?("prepared") }
-      face      = prepared ? (apiCardInfo.dig("card_faces", 0) || apiCardInfo) : apiCardInfo
-
-      @name         = face["name"]
-      @mana_cost    = face["mana_cost"]
-      @oracle_text  = face["oracle_text"]
-      type_line     = apiCardInfo["type_line"] || apiCardInfo.dig("card_faces", 0, "type_line") || ""
-      @is_legendary = type_line.include?("Legendary")
-      @is_saga      = type_line.include?("Saga")
+      @name        = face["name"]
+      @mana_cost   = face["mana_cost"]
+      @oracle_text = face["oracle_text"]
+      type_line    = api_card_info["type_line"] || api_card_info.dig("card_faces", 0, "type_line") || ""
+      @legendary   = type_line.include?("Legendary")
+      @saga        = type_line.include?("Saga")
       @art_crop_url = art_crop_url ||
-                      apiCardInfo.dig("image_uris", "art_crop") ||
-                      apiCardInfo.dig("card_faces", 0, "image_uris", "art_crop")
-      @second_face  = prepared ? apiCardInfo.dig("card_faces", 1) : nil
-      @power        = power.nil? ? apiCardInfo["power"] : power
-      @toughness    = toughness.nil? ? apiCardInfo["toughness"] : toughness
+                      api_card_info.dig("image_uris", "art_crop") ||
+                      api_card_info.dig("card_faces", 0, "image_uris", "art_crop")
+      @second_face = prepared ? api_card_info.dig("card_faces", 1) : nil
+      @power       = power.nil? ? api_card_info["power"] : power
+      @toughness   = toughness.nil? ? api_card_info["toughness"] : toughness
+    end
+
+    def legendary?
+      @legendary
+    end
+
+    def saga?
+      @saga
     end
 
     def type
-      "TOKEN #{"Legendary " if @is_legendary}#{"Enchantment " if @is_saga}Creature - #{"Saga" if @is_saga} Zombie"
+      "TOKEN #{"Legendary " if @legendary}#{"Enchantment " if @saga}Creature - #{"Saga" if @saga} Zombie"
     end
 
     def stat_line
@@ -32,7 +38,7 @@ module Scryfall
     end
 
     def raw_cost
-      mana_cost.tr("{", "").split("}").join("")
+      self.class.strip_mana_cost(mana_cost)
     end
 
     def processed_name
@@ -42,5 +48,10 @@ module Scryfall
             .downcase
     end
 
+    # Strip the {…} delimiters from a Scryfall mana-cost string,
+    # e.g. "{4}{B}{B}" => "4BB".
+    def self.strip_mana_cost(mana_cost)
+      mana_cost.to_s.tr("{", "").split("}").join
+    end
   end
 end

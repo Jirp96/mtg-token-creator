@@ -6,98 +6,124 @@ require_relative "lib/scryfall"
 require_relative "lib/image_generation"
 require_relative "lib/pdf_generation"
 
-NAME_COLUMN = 0
-ART_SELECTOR_COLUMN = 1
-OUTPUT_IMAGES_PATH = "./output"
+# Reads card names (and optional art selectors) from a CSV, fetches each card
+# from Scryfall, renders a token image, and assembles a printable PDF sheet.
+class TokenCreator
+  NAME_COLUMN         = 0
+  ART_SELECTOR_COLUMN = 1
+  OUTPUT_IMAGES_PATH  = "./output"
+  PDF_FILE_NAME       = "pdf_sheet"
+  DEFAULT_POWER       = 4
+  DEFAULT_TOUGHNESS   = 4
+  RATE_LIMIT_STATUS   = 429
 
-def csv_value(row, column)
-  value = row[column]
-  return nil if value.nil?
+  def self.run(argv)
+    new.run(argv)
+  end
 
-  value.strip
-end
+  def run(argv)
+    raise StandardError unless argv.length.positive? # TODO: Custom error
 
-def resolve_art_crop_url(card_info, art_selector)
-  return nil if art_selector.nil? || art_selector.empty?
+    cards = load_cards(argv[0])
+    render_images(cards)
+    build_pdf
+    delete_temporary_images
+  end
 
-  selected_printing = if Scryfall::Cards.scryfall_card_url?(art_selector)
-                        printing_from_scryfall_url(art_selector)
-                      else
-                        printing_from_set_code(card_info, art_selector)
-                      end
+  private
 
-  art_crop_url = selected_printing&.dig("image_uris", "art_crop")
-  return art_crop_url unless art_crop_url.nil? || art_crop_url.empty?
+  def load_cards(csv_path)
+    cards = []
 
-  warn "Could not find selected art for #{card_info["name"]} using '#{art_selector}'. Using default art."
-  nil
-rescue StandardError => error
-  warn "Could not find selected art for #{card_info["name"]} using '#{art_selector}': #{error.message}. Using default art."
-  nil
-end
+    CSV.foreach(csv_path) do |row|
+      card_name = csv_value(row, NAME_COLUMN)
+      next if blank?(card_name)
 
-def printing_from_scryfall_url(art_selector)
-  url_parts = Scryfall::Cards.parse_scryfall_card_url(art_selector)
-  return nil if url_parts.nil?
-
-  Scryfall::Cards.get_by_set_and_number(
-    url_parts[:set_code],
-    url_parts[:collector_number]
-  )
-end
-
-def printing_from_set_code(card_info, set_code)
-  prints_search_uri = card_info["prints_search_uri"]
-  return nil if prints_search_uri.nil? || prints_search_uri.empty?
-
-  Scryfall::Cards.get_print_from_uri(prints_search_uri, set_code)
-end
-
-def main()
-  raise StandardError unless ARGV.length > 0 #TODO: Custom error
-
-  fileName = ARGV[0]
-
-  cards = []
-
-  CSV.foreach(fileName) do |row|
-    cardName = csv_value(row, NAME_COLUMN)
-    next if cardName.nil? || cardName.empty?
-
-    p "Processing '#{cardName}'"
-    artSelector = csv_value(row, ART_SELECTOR_COLUMN)
-    cardApiResponse = Scryfall::Cards.get(cardName)
-    abort "Scryfall rate limit exceeded while fetching '#{cardName}'. Wait a moment and try again." if cardApiResponse.status.code == 429
-    unless cardApiResponse.status.success?
-      warn "Scryfall could not find '#{cardName}' (HTTP #{cardApiResponse.status.code}). Skipping."
-      next
+      log "Processing '#{card_name}'"
+      card = fetch_card(card_name, csv_value(row, ART_SELECTOR_COLUMN))
+      cards << card if card
     end
 
-    cardInfo = cardApiResponse.parse
-    artCropUrl = resolve_art_crop_url(cardInfo, artSelector)
-
-    cardData = Scryfall::Card.new(cardInfo, 4, 4, artCropUrl)
-
-    cards << cardData
+    cards
   end
 
-  p "Generating images"
+  def fetch_card(card_name, art_selector)
+    response = Scryfall::Cards.get(card_name)
+    abort "Scryfall rate limit exceeded while fetching '#{card_name}'. Wait a moment and try again." if response.status.code == RATE_LIMIT_STATUS
 
-  cards.each do |card|
-    ImageGeneration.generate(card)
+    unless response.status.success?
+      warn "Scryfall could not find '#{card_name}' (HTTP #{response.status.code}). Skipping."
+      return nil
+    end
+
+    card_info = response.parse
+    art_crop_url = resolve_art_crop_url(card_info, art_selector)
+    Scryfall::Card.new(card_info, DEFAULT_POWER, DEFAULT_TOUGHNESS, art_crop_url)
   end
 
-  p "Generating pdf"
-
-  #Create PDF with cards ready for print
-  PdfGeneration.generate(OUTPUT_IMAGES_PATH, "pdf_sheet")
-
-  p "Deleting temporary images"
-  # Delete temporary files
-  Dir.glob("#{OUTPUT_IMAGES_PATH}/*.jpg").each do |file|
-    File.delete(file)
+  def render_images(cards)
+    log "Generating images"
+    cards.each { |card| ImageGeneration.generate(card) }
   end
 
+  def build_pdf
+    log "Generating pdf"
+    PdfGeneration.generate(OUTPUT_IMAGES_PATH, PDF_FILE_NAME)
+  end
+
+  def delete_temporary_images
+    log "Deleting temporary images"
+    Dir.glob("#{OUTPUT_IMAGES_PATH}/*.jpg").each { |file| File.delete(file) }
+  end
+
+  def resolve_art_crop_url(card_info, art_selector)
+    return nil if blank?(art_selector)
+
+    selected_printing =
+      if Scryfall::Cards.scryfall_card_url?(art_selector)
+        printing_from_scryfall_url(art_selector)
+      else
+        printing_from_set_code(card_info, art_selector)
+      end
+
+    art_crop_url = selected_printing&.dig("image_uris", "art_crop")
+    return art_crop_url unless blank?(art_crop_url)
+
+    warn "Could not find selected art for #{card_info["name"]} using '#{art_selector}'. Using default art."
+    nil
+  rescue StandardError => error
+    warn "Could not find selected art for #{card_info["name"]} using '#{art_selector}': #{error.message}. Using default art."
+    nil
+  end
+
+  def printing_from_scryfall_url(art_selector)
+    url_parts = Scryfall::Cards.parse_scryfall_card_url(art_selector)
+    return nil if url_parts.nil?
+
+    Scryfall::Cards.get_by_set_and_number(url_parts[:set_code], url_parts[:collector_number])
+  end
+
+  def printing_from_set_code(card_info, set_code)
+    prints_search_uri = card_info["prints_search_uri"]
+    return nil if blank?(prints_search_uri)
+
+    Scryfall::Cards.get_print_from_uri(prints_search_uri, set_code)
+  end
+
+  def csv_value(row, column)
+    value = row[column]
+    return nil if value.nil?
+
+    value.strip
+  end
+
+  def blank?(value)
+    value.nil? || value.empty?
+  end
+
+  def log(message)
+    $stdout.puts(message)
+  end
 end
 
-main()
+TokenCreator.run(ARGV) if __FILE__ == $PROGRAM_NAME
