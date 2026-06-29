@@ -9,18 +9,12 @@ require_relative "title_section_renderer"
 require_relative "oracle_text_renderer"
 require_relative "second_face_renderer"
 
-# Orchestrates rendering a single card image onto the card template: title and
-# mana pips, cropped art, type line, oracle text (delegated to
-# OracleTextRenderer), the optional second-face box (delegated to
-# SecondFaceRenderer), and the P/T stat line. Writes the result as a JPEG.
 module ImageGeneration
   include Layout
   extend VipsHelpers
 
   OUTPUT_DIR = "output".freeze
 
-  # Art download is best-effort: time out, retry a couple of times, and on
-  # failure fall back to a card with no art rather than aborting the batch.
   ART_DOWNLOAD_TIMEOUT = 15 # seconds
   ART_DOWNLOAD_RETRIES = 2
 
@@ -37,8 +31,6 @@ module ImageGeneration
     image.write_to_file("#{OUTPUT_DIR}/#{card.processed_name}.jpg", Q: 85, strip: true, interlace: false)
   end
 
-  # Composite the card art, skipping it (with a warning already logged) when the
-  # download fails so a single bad image doesn't sink the whole sheet.
   def self.add_art(image, card)
     art_data = download_image(card.art_crop_url)
     return image if art_data.nil?

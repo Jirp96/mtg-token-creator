@@ -3,11 +3,7 @@ require "vips"
 require_relative "vips_helpers"
 require_relative "scryfall/card"
 
-# Renders the inset "second face" box used by prepared double-faced tokens:
-# a bordered panel with name + mana cost, type line, and oracle text, separated
-# by horizontal rules.
 class SecondFaceRenderer
-  # Horizontal room reserved for the mana cost to the right of the name.
   NAME_MANA_RESERVE = 150
 
   include VipsHelpers

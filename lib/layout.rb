@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-# Single source of truth for the magic numbers, fonts, and colors used when
-# rendering a card image. Values are intentionally identical to the previous
-# inline constants — this module only groups and namespaces them.
 module Layout
   # --- Card template ---------------------------------------------------------
   CARD_TEMPLATE_FILE_NAME = "card_template.png"
