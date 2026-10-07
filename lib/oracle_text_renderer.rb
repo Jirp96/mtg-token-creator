@@ -1,35 +1,41 @@
 require "vips"
 
 require_relative "vips_helpers"
+require_relative "mana_symbol_renderer"
+require_relative "text_metrics"
 
 # Renders MTG oracle text with inline mana symbols, wrapping to a pixel width.
-# Glyph/baseline metrics depend only on the fonts, so they are memoized per
-# instance (state ownership is explicit, unlike the previous module-level cache).
+# Reminder text (in parentheses) is set in italics, and paragraphs get extra
+# spacing like on printed cards.
 class OracleTextRenderer
   include VipsHelpers
 
   # A mana symbol like {2}{W}, a run of whitespace, or a plain word.
   TOKEN_PATTERN = /\{[^}]+\}|\s+|[^\s{]+/
 
+  attr_reader :font_size
+
+  def initialize(font_size: ORACLE_FONT_SIZES.first, symbols: ManaSymbolRenderer.new)
+    @font_size       = font_size
+    @font            = "#{ORACLE_FONT_FAMILY} #{font_size}"
+    @symbols         = symbols
+    @symbol_diameter = (font_size * ORACLE_SYMBOL_SCALE).round
+    @line_gap        = (font_size * ORACLE_LINE_GAP_RATIO).round
+    @paragraph_gap   = (font_size * ORACLE_PARAGRAPH_GAP_RATIO).round
+    @metrics         = TextMetrics.new(@font)
+  end
+
   # Render `text` to an RGBA layer no wider than `width`.
   def render(text, width)
     lines = wrapped_oracle_lines(text.to_s, width)
-    total_height = lines.sum { |line| line[:height] } + (ORACLE_LINE_GAP * [lines.length - 1, 0].max)
-    total_height = default_oracle_line_height if total_height.zero?
-    canvas = transparent_layer(width, total_height)
+    total_height = lines.each_with_index.sum { |line, i| @metrics.line_height + (i.zero? ? 0 : gap_before(line)) }
+    canvas = transparent_layer(width, [total_height, @metrics.line_height].max)
 
     y = 0
-    lines.each do |line|
-      x = 0
-
-      line[:items].each do |item|
-        x += item[:space_before]
-        item_image = leading_symbol?(item, x) ? remove_leading_symbol_padding(item[:image]) : item[:image]
-        canvas = canvas.insert(item_image, x, y)
-        x += item_image.width
-      end
-
-      y += line[:height] + ORACLE_LINE_GAP
+    lines.each_with_index do |line, i|
+      y += gap_before(line) unless i.zero?
+      canvas = draw_line(canvas, line[:items], y)
+      y += @metrics.line_height
     end
 
     canvas
@@ -37,21 +43,38 @@ class OracleTextRenderer
 
   private
 
-  def leading_symbol?(item, x)
-    item[:symbol] && x.zero?
+  # Consecutive words are rendered as a single run so Pango handles spacing
+  # and kerning (important for italics, whose glyphs overhang their advance).
+  def draw_line(canvas, items, y)
+    x = 0
+    items.chunk_while { |a, b| !a[:symbol] && !b[:symbol] }.each do |group|
+      x += group.first[:space_before]
+      layer =
+        if group.first[:symbol]
+          x.zero? ? remove_leading_symbol_padding(group.first[:image]) : group.first[:image]
+        else
+          oracle_text_layer(group.map { |item| item[:markup] }.join(" "))
+        end
+      canvas = canvas.composite(layer, :over, x: x, y: y)
+      x += layer.width
+    end
+    canvas
   end
 
-  def remove_leading_symbol_padding(symbol_layer)
-    symbol_layer.crop(
-      ORACLE_SYMBOL_HORIZONTAL_PADDING,
-      0,
-      symbol_layer.width - ORACLE_SYMBOL_HORIZONTAL_PADDING,
-      symbol_layer.height
-    )
+  def gap_before(line)
+    line[:paragraph_start] ? @line_gap + @paragraph_gap : @line_gap
+  end
+
+  def remove_leading_symbol_padding(layer)
+    layer.crop(ORACLE_SYMBOL_HORIZONTAL_PADDING, 0, layer.width - ORACLE_SYMBOL_HORIZONTAL_PADDING, layer.height)
   end
 
   def wrapped_oracle_lines(text, width)
-    text.split("\n", -1).flat_map { |paragraph| wrap_paragraph(paragraph, width) }
+    text.split("\n", -1).flat_map do |paragraph|
+      lines = wrap_paragraph(paragraph, width)
+      lines.first[:paragraph_start] = true
+      lines
+    end
   end
 
   # Greedily pack a single paragraph's tokens into lines no wider than `width`.
@@ -59,8 +82,8 @@ class OracleTextRenderer
     lines = []
     items = []
     line_width = 0
-    line_height = default_oracle_line_height
     pending_space = false
+    italic = false
 
     paragraph.scan(TOKEN_PATTERN).each do |token|
       if token.match?(/\A\s+\z/)
@@ -68,33 +91,35 @@ class OracleTextRenderer
         next
       end
 
-      image = oracle_token_image(token)
-      space = pending_space && !items.empty? ? oracle_space_width : 0
+      italic ||= token.start_with?("(")
+      item = oracle_item(token, italic)
+      italic = false if token.include?(")")
+      space = pending_space && !items.empty? ? @metrics.space_width : 0
 
-      if line_width.positive? && line_width + space + image.width > width
-        lines << { items: items, height: line_height }
+      if line_width.positive? && line_width + space + item[:width] > width
+        lines << { items: items }
         items = []
         line_width = 0
-        line_height = default_oracle_line_height
         space = 0
       end
 
-      items << { image: image, space_before: space, symbol: oracle_symbol_token?(token) }
-      line_width += space + image.width
-      line_height = [line_height, image.height].max
+      items << item.merge(space_before: space)
+      line_width += space + item[:width]
       pending_space = false
     end
 
-    lines << { items: items, height: line_height }
+    lines << { items: items }
     lines
   end
 
-  def oracle_token_image(token)
+  def oracle_item(token, italic)
     if oracle_symbol_token?(token)
-      symbol_text = token[1...-1].downcase.delete("/")
-      padded_symbol_layer(text_layer(symbol_text, ORACLE_SYMBOL_FONT, ORACLE_SYMBOL_FONT_FILE))
+      image = padded_symbol_layer(@symbols.render(token[1...-1], @symbol_diameter))
+      { symbol: true, image: image, width: image.width }
     else
-      oracle_text_layer(token)
+      markup = escape_markup(token)
+      markup = "<i>#{markup}</i>" if italic
+      { symbol: false, markup: markup, width: @metrics.advance_width(markup) }
     end
   end
 
@@ -102,22 +127,24 @@ class OracleTextRenderer
     token.start_with?("{") && token.end_with?("}")
   end
 
-  def padded_symbol_layer(symbol_layer)
-    padded_layer = transparent_layer(
-      symbol_layer.width + (ORACLE_SYMBOL_HORIZONTAL_PADDING * 2),
-      default_oracle_line_height
-    )
-    symbol_y = oracle_text_visible_bottom - symbol_layer.height + ORACLE_SYMBOL_BASELINE_ADJUST
-    symbol_y = [[symbol_y, 0].max, default_oracle_line_height - symbol_layer.height].min
-
-    padded_layer.insert(symbol_layer, ORACLE_SYMBOL_HORIZONTAL_PADDING, symbol_y)
+  def escape_markup(text)
+    text.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
   end
 
-  def oracle_text_layer(text)
-    prefixed_text = "#{ORACLE_TEXT_BASELINE_PREFIX}#{text}"
-    full_text = text_layer(prefixed_text, ORACLE_TEXT_FONT)
-    prefix_width = oracle_baseline_prefix_width
-    token_layer = full_text.crop(prefix_width, 0, full_text.width - prefix_width, full_text.height)
+  # Sit the symbol on the text baseline, dipping slightly below it.
+  def padded_symbol_layer(symbol_layer)
+    padded_layer = transparent_layer(symbol_layer.width + (ORACLE_SYMBOL_HORIZONTAL_PADDING * 2), @metrics.line_height)
+    symbol_y = @metrics.baseline - symbol_layer.height + (symbol_layer.height * 0.1).round
+    symbol_y = symbol_y.clamp(0, [@metrics.line_height - symbol_layer.height, 0].max)
+
+    padded_layer.composite(symbol_layer, :over, x: ORACLE_SYMBOL_HORIZONTAL_PADDING, y: symbol_y)
+  end
+
+  # Render text with a fixed prefix so every run shares the same baseline,
+  # then cut the prefix off again.
+  def oracle_text_layer(markup)
+    full_text = text_layer("#{ORACLE_TEXT_BASELINE_PREFIX}#{markup}", @font)
+    token_layer = full_text.crop(@metrics.prefix_width, 0, full_text.width - @metrics.prefix_width, full_text.height)
     normalize_oracle_layer(trim_oracle_layer_horizontally(token_layer))
   end
 
@@ -129,35 +156,8 @@ class OracleTextRenderer
   end
 
   def normalize_oracle_layer(layer)
-    return layer if layer.height == default_oracle_line_height
-    return layer if layer.height > default_oracle_line_height
+    return layer if layer.height >= @metrics.line_height
 
-    transparent_layer(layer.width, default_oracle_line_height).insert(
-      layer,
-      0,
-      default_oracle_line_height - layer.height
-    )
-  end
-
-  # --- Memoized font metrics -------------------------------------------------
-
-  def oracle_baseline_prefix_width
-    @oracle_baseline_prefix_width ||= Vips::Image.text(ORACLE_TEXT_BASELINE_PREFIX, font: ORACLE_TEXT_FONT).width
-  end
-
-  def oracle_space_width
-    @oracle_space_width ||= Vips::Image.text("n n", font: ORACLE_TEXT_FONT).width - Vips::Image.text("nn", font: ORACLE_TEXT_FONT).width
-  end
-
-  def oracle_text_visible_bottom
-    @oracle_text_visible_bottom ||= begin
-      mask = Vips::Image.text(ORACLE_TEXT_METRIC_SAMPLE, font: ORACLE_TEXT_FONT).extract_band(0)
-      _left, top, _width, height = mask.find_trim(background: 0)
-      top + height
-    end
-  end
-
-  def default_oracle_line_height
-    @default_oracle_line_height ||= Vips::Image.text(ORACLE_TEXT_METRIC_SAMPLE, font: ORACLE_TEXT_FONT).height
+    transparent_layer(layer.width, @metrics.line_height).insert(layer, 0, @metrics.line_height - layer.height)
   end
 end

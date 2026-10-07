@@ -11,8 +11,8 @@ require "scryfall/card"
 # On first run (or when the golden is intentionally regenerated) set
 # GOLDEN_REGEN=1 to write a new reference image rather than comparing.
 #
-# This test does NOT require fonts/NDPMTG.ttf; the fixture card uses plain oracle
-# text with no inline mana symbols so only system fonts are exercised. The art
+# The golden reference is rendered with the card fonts in fonts/ (see README);
+# without them the system fallback fonts produce a different image. The art
 # download is stubbed with a 100% blue JPEG to make the test hermetic.
 RSpec.describe ImageGeneration do
   GOLDEN_PATH = File.join(FIXTURES_DIR, "golden_card.jpg")

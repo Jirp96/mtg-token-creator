@@ -27,13 +27,15 @@
 #       - name: Install native dependency
 #         run: sudo apt-get install -y --no-install-recommends libvips42
 #
-#       # The NDPMTG mana-symbol font is not committed (third-party); the
-#       # golden-image spec renders title pips with it, so fetch it for CI.
-#       - name: Fetch symbol font
+#       # The card fonts are not committed (third-party); the golden-image
+#       # spec renders with them, so fetch them for CI.
+#       - name: Fetch card fonts
 #         run: |
 #           mkdir -p fonts
-#           curl -sSfL -o fonts/NDPMTG.ttf \
-#             https://raw.githubusercontent.com/chilli-axe/mtg-photoshop-automation/master/fonts/NDPMTG.ttf
+#           for font in NDPMTG.ttf Beleren2016-Bold-Asterisk.ttf PlantinMTProRg.TTF PlantinMTProRgIt.TTF; do
+#             curl -sSfL -o "fonts/$font" \
+#               "https://raw.githubusercontent.com/chilli-axe/mtg-photoshop-automation/master/fonts/$font"
+#           done
 #
 #       - name: RuboCop
 #         run: bundle exec rubocop

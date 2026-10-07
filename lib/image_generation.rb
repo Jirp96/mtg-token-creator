@@ -1,12 +1,13 @@
 require "fileutils"
-require "net/http"
-require "uri"
 require "vips"
 
 require_relative "layout"
 require_relative "vips_helpers"
+require_relative "art_downloader"
+require_relative "frame_renderer"
+require_relative "mana_symbol_renderer"
 require_relative "title_section_renderer"
-require_relative "oracle_text_renderer"
+require_relative "rules_text_fitter"
 require_relative "second_face_renderer"
 
 module ImageGeneration
@@ -15,24 +16,24 @@ module ImageGeneration
 
   OUTPUT_DIR = "output".freeze
 
-  ART_DOWNLOAD_TIMEOUT = 15 # seconds
-  ART_DOWNLOAD_RETRIES = 2
-
   def self.generate(card)
-    image = load_template
-    image = add_title(image, card.name, card.raw_cost.downcase, CARD_ART_WIDTH, CARD_TITLE_X, CARD_TITLE_POSITION, ORACLE_SYMBOL_FONT_FILE)
+    palette = FRAME_PALETTES.fetch(card.frame_color, FRAME_PALETTES["C"])
 
+    image = load_template
+    image = image.composite(frame_renderer.render(palette), :over)
     image = add_art(image, card) unless card.saga?
-    image = add_text(image, card.type, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_TYPES_POSITION, CARD_TYPES_FONT)
-    image = add_oracle_section(image, card)
-    image = add_text(image, card.stat_line, CARD_TEXT_SIZE, CARD_STAT_LINE_X_POSITION, CARD_STAT_LINE_Y_POSITION)
+    image = add_title(image, card.name, card.mana_cost)
+    image = add_bar_text(image, card.type, TYPE_BAR_Y, TYPE_FONT_SIZE)
+    image = add_oracle_section(image, card, palette)
+    image = add_stat_line(image, card.stat_line)
 
     FileUtils.mkdir_p(OUTPUT_DIR)
-    image.write_to_file("#{OUTPUT_DIR}/#{card.processed_name}.jpg", Q: 85, strip: true, interlace: false)
+    image.flatten(background: [255, 255, 255])
+         .write_to_file("#{OUTPUT_DIR}/#{card.processed_name}.jpg", Q: 90, strip: true, interlace: false)
   end
 
   def self.add_art(image, card)
-    art_data = download_image(card.art_crop_url)
+    art_data = ArtDownloader.fetch(card.art_crop_url)
     return image if art_data.nil?
 
     add_image(image, art_data, CARD_ART_X, CARD_ART_Y)
@@ -41,34 +42,48 @@ module ImageGeneration
   def self.load_template
     template = Vips::Image.new_from_file(CARD_TEMPLATE_FILE_NAME, access: :sequential)
     template = template.bandjoin(255) if template.bands == 3
-    template
+    template.copy(interpretation: :srgb)
+  end
+
+  def self.add_title(image, name, mana_cost)
+    width = BAR_WIDTH - (BAR_TEXT_PADDING * 2)
+    line = TitleSectionRenderer.new(width: width, symbols: mana_symbols).render(card_name: name, mana_cost: mana_cost)
+    image.composite(line, :over, x: BAR_X + BAR_TEXT_PADDING, y: TITLE_BAR_Y + vertical_center(BAR_HEIGHT, line.height))
+  end
+
+  # Single-line Beleren text, left aligned and vertically centered in a bar.
+  def self.add_bar_text(image, text, bar_y, font_size)
+    layer = fit_width(text_layer(text.to_s, "#{TITLE_FONT_FAMILY} #{font_size}"), BAR_WIDTH - (BAR_TEXT_PADDING * 2))
+    image.composite(layer, :over, x: BAR_X + BAR_TEXT_PADDING, y: bar_y + vertical_center(BAR_HEIGHT, layer.height))
+  end
+
+  def self.add_stat_line(image, stat_line)
+    layer = text_layer(stat_line, "#{TITLE_FONT_FAMILY} #{PT_FONT_SIZE}")
+    image.composite(layer, :over,
+                    x: PT_BOX_X + vertical_center(PT_BOX_WIDTH, layer.width),
+                    y: PT_BOX_Y + vertical_center(PT_BOX_HEIGHT, layer.height))
   end
 
   # Oracle text, plus the second-face box for prepared double-faced tokens.
-  def self.add_oracle_section(image, card)
-    return add_oracle_text(image, card.oracle_text, CARD_TEXT_SIZE, CARD_TEXT_X_MARGIN, CARD_ORACLE_TEXT_POSITION) unless card.second_face
+  def self.add_oracle_section(image, card, palette)
+    inner_x = TEXT_BOX_X + TEXT_BOX_PADDING_X
+    inner_w = TEXT_BOX_WIDTH - (TEXT_BOX_PADDING_X * 2)
+    return add_oracle_text(image, card.oracle_text, inner_x, inner_w) unless card.second_face
 
-    main_w = CARD_TEXT_SIZE - SECOND_FACE_BOX_WIDTH - SECOND_FACE_BOX_GAP
-    image = add_oracle_text(image, card.oracle_text, main_w, CARD_TEXT_X_MARGIN, CARD_ORACLE_TEXT_POSITION)
+    main_w = inner_w - SECOND_FACE_BOX_WIDTH - SECOND_FACE_BOX_GAP
+    image = add_oracle_text(image, card.oracle_text, inner_x, main_w)
 
-    box = second_face_renderer.render(card.second_face, SECOND_FACE_BOX_WIDTH, SECOND_FACE_BOX_HEIGHT)
-    image.composite(box, :over, x: CARD_TEXT_X_MARGIN + main_w + SECOND_FACE_BOX_GAP, y: CARD_ORACLE_TEXT_POSITION)
+    # The box sits in the right column, so it must end above the P/T box.
+    box_h = PT_BOX_Y - PT_BOX_CLEARANCE - (TEXT_BOX_Y + TEXT_BOX_PADDING_Y)
+    box = second_face_renderer.render(card.second_face, SECOND_FACE_BOX_WIDTH, box_h, palette)
+    image.composite(box, :over, x: inner_x + main_w + SECOND_FACE_BOX_GAP, y: TEXT_BOX_Y + TEXT_BOX_PADDING_Y)
   end
 
-  def self.add_oracle_text(image, text, width, x, y)
-    image.composite(oracle_renderer.render(text, width), :over, x: x, y: y)
-  end
+  def self.add_oracle_text(image, text, x, width)
+    return image if text.to_s.strip.empty?
 
-  def self.add_title(image, title_text, pips_text, width, x, y, font_file = nil)
-    renderer = TitleSectionRenderer.new(
-      width: width,
-      padding: 0,
-      pips_font: CARD_PIPS_FONT,
-      pips_font_file: font_file
-    )
-
-    line = renderer.render(card_name: title_text, pips_text: pips_text)
-    image.composite(line, :over, x: x, y: y)
+    layer, y = rules_text_fitter.fit(text, x, width)
+    image.composite(layer, :over, x: x, y: y)
   end
 
   def self.add_image(image, image_buffer, x, y)
@@ -87,37 +102,17 @@ module ImageGeneration
     image.composite(art, :over, x: x, y: y)
   end
 
-  def self.download_image(image_url)
-    return nil if image_url.to_s.empty?
-
-    uri = URI(image_url)
-    http_options = {
-      use_ssl: uri.scheme == "https",
-      open_timeout: ART_DOWNLOAD_TIMEOUT,
-      read_timeout: ART_DOWNLOAD_TIMEOUT
-    }
-    retries = 0
-
-    begin
-      Net::HTTP.start(uri.hostname, uri.port, **http_options) do |http|
-        response = http.request(Net::HTTP::Get.new(uri))
-        return response.body if response.is_a?(Net::HTTPSuccess)
-
-        warn "Could not download art from #{image_url} (HTTP #{response.code}). Rendering without art."
-        return nil
-      end
-    rescue StandardError => e
-      retries += 1
-      retry if retries <= ART_DOWNLOAD_RETRIES
-
-      warn "Could not download art from #{image_url}: #{e.message}. Rendering without art."
-      nil
-    end
+  # Renderers are reused across cards; their caches depend only on fonts.
+  def self.rules_text_fitter
+    @rules_text_fitter ||= RulesTextFitter.new(mana_symbols)
   end
 
-  # Reused across cards; the cached font metrics inside depend only on fonts.
-  def self.oracle_renderer
-    @oracle_renderer ||= OracleTextRenderer.new
+  def self.mana_symbols
+    @mana_symbols ||= ManaSymbolRenderer.new
+  end
+
+  def self.frame_renderer
+    @frame_renderer ||= FrameRenderer.new
   end
 
   def self.second_face_renderer

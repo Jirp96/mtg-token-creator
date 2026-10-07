@@ -1,73 +1,70 @@
 require "vips"
 
 require_relative "vips_helpers"
-require_relative "scryfall/card"
+require_relative "title_section_renderer"
+require_relative "oracle_text_renderer"
 
+# Renders the back face of a "prepared" token as an inset mini-card inside the
+# rules-text box: name + cost, type line, and oracle text.
 class SecondFaceRenderer
-  NAME_MANA_RESERVE = 150
-
   include VipsHelpers
 
-  def render(second_face, width, height)
+  def render(second_face, width, height, palette)
     pad     = SECOND_FACE_BOX_PADDING
     x_start = SECOND_FACE_BORDER + pad
-    inner_w = width - x_start - pad
+    inner_w = width - (x_start * 2)
 
-    bg = background(width, height)
+    bg = background(width, height, palette)
     y  = SECOND_FACE_BORDER + pad
 
-    name_text = second_face["name"] || ""
-    bg = add_text(bg, name_text, inner_w - NAME_MANA_RESERVE, x_start, y, SECOND_FACE_NAME_FONT)
-    bg = composite_mana_cost(bg, second_face["mana_cost"], width, pad, y)
-    y  = advance(y, name_text, SECOND_FACE_NAME_FONT, pad)
+    [title_layer(second_face, inner_w), type_layer(second_face, inner_w)].each do |layer|
+      bg = bg.composite(layer, :over, x: x_start, y: y)
+      y += layer.height + pad
+      bg = draw_separator(bg, x_start, y, inner_w, palette)
+      y += SECOND_FACE_SEPARATOR_H + pad
+    end
 
-    bg = draw_separator(bg, x_start, y, inner_w)
-    y += SECOND_FACE_SEPARATOR_H + pad
-
-    type_text = second_face["type_line"] || ""
-    bg = add_text(bg, type_text, inner_w, x_start, y, SECOND_FACE_TYPE_FONT)
-    y  = advance(y, type_text, SECOND_FACE_TYPE_FONT, pad)
-
-    bg = draw_separator(bg, x_start, y, inner_w)
-    y += SECOND_FACE_SEPARATOR_H + pad
-
-    oracle_text = second_face["oracle_text"] || ""
-    bg = add_text(bg, oracle_text, inner_w, x_start, y, SECOND_FACE_ORACLE_FONT) unless oracle_text.empty?
-
-    bg
+    oracle = oracle_layer(second_face["oracle_text"].to_s, inner_w, height - y - pad)
+    oracle.nil? ? bg : bg.composite(oracle, :over, x: x_start, y: y)
   end
 
   private
 
-  # A border-colored panel with a slightly inset background fill.
-  def background(width, height)
-    inner = Vips::Image.black(width - (SECOND_FACE_BORDER * 2), height - (SECOND_FACE_BORDER * 2))
-                       .new_from_image(SECOND_FACE_BG_COLOR)
-                       .copy(interpretation: :srgb)
-
-    Vips::Image.black(width, height)
-               .new_from_image(SECOND_FACE_BORDER_COLOR)
-               .copy(interpretation: :srgb)
-               .composite(inner, :over, x: SECOND_FACE_BORDER, y: SECOND_FACE_BORDER)
+  def title_layer(second_face, width)
+    TitleSectionRenderer.new(width: width, font_size: SECOND_FACE_NAME_SIZE, pip_diameter: SECOND_FACE_PIP_DIAMETER)
+                        .render(card_name: second_face["name"].to_s, mana_cost: second_face["mana_cost"])
   end
 
-  def composite_mana_cost(image, mana_cost, width, pad, y)
-    cost = Scryfall::Card.strip_mana_cost(mana_cost).downcase
-    return image if cost.empty?
-
-    pips = text_layer(cost, SECOND_FACE_PIPS_FONT, ORACLE_SYMBOL_FONT_FILE)
-    image.composite(pips, :over, x: width - SECOND_FACE_BORDER - pad - pips.width, y: y)
+  def type_layer(second_face, width)
+    fit_width(text_layer(second_face["type_line"].to_s, "#{TITLE_FONT_FAMILY} #{SECOND_FACE_TYPE_SIZE}"), width)
   end
 
-  # Move the y cursor past a line of `text` rendered in `font`, plus padding.
-  def advance(y, text, font, pad)
-    measured = text.empty? ? " " : text
-    y + Vips::Image.text(measured, font: font).height + pad
+  def oracle_layer(text, width, max_height)
+    return nil if text.strip.empty?
+
+    layer = nil
+    SECOND_FACE_ORACLE_SIZES.each do |size|
+      layer = OracleTextRenderer.new(font_size: size).render(text, width)
+      break if layer.height <= max_height
+    end
+    layer
   end
 
-  def draw_separator(image, x, y, width)
+  def background(width, height, palette)
+    svg = <<~SVG
+      <svg xmlns="http://www.w3.org/2000/svg" width="#{width}" height="#{height}">
+        <rect x="#{SECOND_FACE_BORDER / 2.0}" y="#{SECOND_FACE_BORDER / 2.0}"
+              width="#{width - SECOND_FACE_BORDER}" height="#{height - SECOND_FACE_BORDER}" rx="18"
+              fill="#{svg_color(shade(palette[:box], 0.94))}" stroke="#{svg_color(palette[:edge])}"
+              stroke-width="#{SECOND_FACE_BORDER}"/>
+      </svg>
+    SVG
+    Vips::Image.svgload_buffer(svg)
+  end
+
+  def draw_separator(image, x, y, width, palette)
     sep = Vips::Image.black(width, SECOND_FACE_SEPARATOR_H)
-                     .new_from_image(SECOND_FACE_BORDER_COLOR)
+                     .new_from_image([*palette[:edge], 255])
                      .copy(interpretation: :srgb)
     image.composite(sep, :over, x: x, y: y)
   end

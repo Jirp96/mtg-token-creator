@@ -17,7 +17,7 @@ Open the project in VS Code (or any [Dev Containers](https://containers.dev/)-co
 editor) and choose **Reopen in Container**. `bundle install` runs automatically on
 creation.
 
-Then [download the font](#font-setup) and you're ready to go.
+Then [download the fonts](#font-setup) and you're ready to go.
 
 ### Option B — Local setup
 
@@ -49,15 +49,21 @@ bundle install
 
 **4. Font setup**
 
-The renderer uses the **NDPMTG** mana-symbol font by
-[chilli-axe](https://github.com/chilli-axe/mtg-photoshop-automation). It is
-not bundled in this repo due to licensing. Download it and place it at
-`fonts/NDPMTG.ttf`:
+The renderer uses the card fonts from
+[chilli-axe](https://github.com/chilli-axe/mtg-photoshop-automation): **NDPMTG**
+(mana symbols), **Beleren** (card name, type line, P/T) and **Plantin**
+(rules text, regular and italic). They are not bundled in this repo due to
+licensing. Download them into `fonts/`:
 
 ```sh
-curl -Lo fonts/NDPMTG.ttf \
-  https://raw.githubusercontent.com/chilli-axe/mtg-photoshop-automation/master/fonts/NDPMTG.ttf
+for font in NDPMTG.ttf Beleren2016-Bold-Asterisk.ttf PlantinMTProRg.TTF PlantinMTProRgIt.TTF; do
+  curl -Lo "fonts/$font" \
+    "https://raw.githubusercontent.com/chilli-axe/mtg-photoshop-automation/master/fonts/$font"
+done
 ```
+
+If Beleren or Plantin are missing the renderer falls back to the system serif
+font; NDPMTG is required for mana symbols.
 
 ## Usage
 

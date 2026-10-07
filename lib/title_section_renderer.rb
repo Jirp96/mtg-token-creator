@@ -1,82 +1,48 @@
 require_relative "vips_helpers"
+require_relative "mana_symbol_renderer"
 
+# Renders a card name (left) and its mana cost pips (right) on a transparent
+# strip, shrinking the name if it would collide with the cost.
 class TitleSectionRenderer
   include VipsHelpers
 
-  DEFAULT_PADDING = 150
-  DEFAULT_GAP     = 80
+  DEFAULT_GAP = 40
 
-  def initialize(
-    width: 2200,
-    font: "Cinzel",
-    font_size: 96,
-    padding: DEFAULT_PADDING,
-    gap: DEFAULT_GAP,
-    pips_font: "Beleren Small Caps",
-    pips_font_file: nil
-  )
-    @width     = width
-    @font      = font
-    @font_size = font_size
-    @padding   = padding
-    @gap       = gap
-    @pips_font = pips_font
-    @pips_font_file = pips_font_file
+  def initialize(width:, font_size: TITLE_FONT_SIZE, pip_diameter: TITLE_PIP_DIAMETER, gap: DEFAULT_GAP, symbols: ManaSymbolRenderer.new)
+    @width        = width
+    @font         = "#{TITLE_FONT_FAMILY} #{font_size}"
+    @pip_diameter = pip_diameter
+    @gap          = gap
+    @symbols      = symbols
   end
 
-  def render(card_name:, pips_text:)
-    name_img = render_text(card_name, @font_size)
-    pips_img = render_text_custom_font(pips_text, @pips_font, @pips_font_file)
+  def render(card_name:, mana_cost:)
+    pips_img = cost_layer(mana_cost)
+    pips_x   = @width - (pips_img&.width || 0)
 
-    name_img = ensure_rgba(name_img).invert
-    pips_img = ensure_rgba(pips_img).invert
+    name_img = fit_width(text_layer(card_name.to_s, @font), pips_x - @gap)
 
-    # Compute fixed pip position (right anchored)
-    pips_x = @width - @padding - pips_img.width
+    height = [name_img.height, pips_img&.height || 0].max
+    strip = transparent_layer(@width, height)
+    strip = strip.composite(name_img, :over, x: 0, y: vertical_center(height, name_img.height))
+    return strip if pips_img.nil?
 
-    # Calculate max width available for name
-    max_name_width = pips_x - @padding - @gap
-
-    if name_img.width > max_name_width
-      scale = max_name_width.to_f / name_img.width
-      name_img = name_img.resize(scale)
-    end
-
-    height = [name_img.height, pips_img.height].max
-
-    title_bar = transparent_canvas(@width, height)
-
-    name_x = @padding
-    name_y = vertical_center(height, name_img.height)
-
-    pips_y = vertical_center(height, pips_img.height)
-
-    title_bar = title_bar.insert(name_img, name_x, name_y)
-    title_bar.insert(pips_img, pips_x, pips_y)
+    strip.composite(pips_img, :over, x: pips_x, y: vertical_center(height, pips_img.height))
   end
 
   private
 
-  def render_text(text, size)
-    Vips::Image.text(
-      text,
-      font: "#{@font} #{size}"
-    )
-  end
+  def cost_layer(mana_cost)
+    pips = ManaSymbolRenderer.parse_cost(mana_cost).map { |code| @symbols.render(code, @pip_diameter, shadow: true) }
+    return nil if pips.empty?
 
-  def render_text_custom_font(text, font, font_file)
-    Vips::Image.text(
-      text,
-      font: font,
-      fontfile: font_file
-    )
-  end
-
-  def ensure_rgba(img)
-    img.extract_band(0)
-  end
-
-  def transparent_canvas(width, height)
-    Vips::Image.black(width, height).new_from_image([255, 255, 255])
+    width = pips.sum(&:width) + (TITLE_PIP_GAP * (pips.length - 1))
+    layer = transparent_layer(width, pips.map(&:height).max)
+    x = 0
+    pips.each do |pip|
+      layer = layer.composite(pip, :over, x: x, y: 0)
+      x += pip.width + TITLE_PIP_GAP
+    end
+    layer
   end
 end
