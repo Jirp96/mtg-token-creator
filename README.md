@@ -83,11 +83,13 @@ No header row. Columns:
 | ------ | -------- | ------- |
 | 1 — card name | yes | Exact card name to look up on Scryfall. Blank rows are skipped. |
 | 2 — art selector | no | Choose a specific printing's art: a Scryfall card URL (e.g. `https://scryfall.com/card/dom/1/...`) or a set code (e.g. `dom`). Falls back to the default art if the selection can't be found. |
+| 3 — art focus | no | Horizontal point of the art to keep centered when it's cropped to the token's taller art window, from `0` (left edge) to `100` (right edge). Defaults to `50`. Useful when the subject isn't in the middle of the illustration. |
 
 ```csv
 Grave Titan
 Llanowar Elves,dom
 Ancestral Recall,https://scryfall.com/card/2ed/48/ancestral-recall
+Sphinx of the Second Sun,,60
 ```
 
 ### Environment variables

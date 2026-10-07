@@ -14,6 +14,7 @@ class TokenCreator
 
   NAME_COLUMN         = 0
   ART_SELECTOR_COLUMN = 1
+  ART_FOCUS_COLUMN    = 2
   OUTPUT_IMAGES_PATH  = "./output".freeze
   PDF_FILE_NAME       = "pdf_sheet".freeze
   DEFAULT_POWER       = 4
@@ -44,7 +45,10 @@ class TokenCreator
 
       log "Processing '#{card_name}'"
       card = fetch_card(card_name, csv_value(row, ART_SELECTOR_COLUMN))
-      cards << card if card
+      next unless card
+
+      card.art_focus = parse_art_focus(card_name, csv_value(row, ART_FOCUS_COLUMN))
+      cards << card
     end
 
     cards
@@ -115,6 +119,18 @@ class TokenCreator
     return nil if blank?(prints_search_uri)
 
     Scryfall::Cards.get_print_from_uri(prints_search_uri, set_code)
+  end
+
+  # Horizontal point of the art (0 = left edge, 100 = right edge) to keep
+  # centered when the art is cropped; nil keeps the default (centered).
+  def parse_art_focus(card_name, value)
+    return nil if blank?(value)
+
+    percent = Float(value, exception: false)
+    return percent / 100.0 if percent&.between?(0, 100)
+
+    warn "Ignoring art focus '#{value}' for '#{card_name}': expected a number from 0 to 100."
+    nil
   end
 
   def csv_value(row, column)

@@ -4,6 +4,8 @@ module Scryfall
 
     attr_reader :name, :mana_cost, :oracle_text, :art_crop_url, :second_face
     attr_accessor :power, :toughness
+    # Horizontal art focus as a 0..1 fraction (nil = centered); see main.rb.
+    attr_accessor :art_focus
 
     def initialize(api_card_info, power = nil, toughness = nil, art_crop_url = nil)
       prepared = (api_card_info["keywords"] || []).any? { |k| k.casecmp?("prepared") }

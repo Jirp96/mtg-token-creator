@@ -45,7 +45,7 @@ module ImageGeneration
     art_data = ArtDownloader.fetch(card.art_crop_url)
     return image if art_data.nil?
 
-    add_image(image, art_data, CARD_ART_X, CARD_ART_Y, CARD_ART_WIDTH, geometry.art_height)
+    add_image(image, art_data, CARD_ART_X, CARD_ART_Y, CARD_ART_WIDTH, geometry.art_height, focus: card.art_focus)
   end
 
   def self.load_template
@@ -103,21 +103,24 @@ module ImageGeneration
     image.composite(box, :over, x: TEXT_BOX_X + TEXT_BOX_WIDTH - TEXT_BOX_PADDING_X - SECOND_FACE_BOX_WIDTH, y: y)
   end
 
-  # Scale `image_buffer` to cover a width x height window, center-cropped.
-  def self.add_image(image, image_buffer, x, y, width, height)
-    art = Vips::Image.new_from_buffer(image_buffer, "", access: :sequential)
-    art = art.colourspace(:srgb) if art.interpretation != :srgb
-    art = art.bandjoin(255) if art.bands == 3
-    art = art.copy(xres: 300.0 / 25.4, yres: 300.0 / 25.4)
+  # Scale `image_buffer` to cover a width x height window and crop it, keeping
+  # the horizontal `focus` (0..1 of the art's width, nil = center) in the middle.
+  def self.add_image(image, image_buffer, x, y, width, height, focus: nil)
+    art = load_art(image_buffer)
+    art = art.resize([width.to_f / art.width, height.to_f / art.height].max)
 
-    scale = [width.to_f / art.width, height.to_f / art.height].max
-    art = art.resize(scale)
-
-    crop_x = [(art.width - width) / 2, 0].max
+    crop_x = ((art.width * (focus || 0.5)) - (width / 2.0)).round.clamp(0, art.width - width)
     crop_y = [(art.height - height) / 2, 0].max
     art = art.crop(crop_x, crop_y, width, height)
 
     image.composite(art, :over, x: x, y: y)
+  end
+
+  def self.load_art(image_buffer)
+    art = Vips::Image.new_from_buffer(image_buffer, "", access: :sequential)
+    art = art.colourspace(:srgb) if art.interpretation != :srgb
+    art = art.bandjoin(255) if art.bands == 3
+    art.copy(xres: 300.0 / 25.4, yres: 300.0 / 25.4)
   end
 
   # Renderers are reused across cards; their caches depend only on fonts.
