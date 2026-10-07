@@ -1,6 +1,8 @@
 module Scryfall
   class Card
-    attr_reader :name, :mana_cost, :oracle_text, :art_crop_url, :second_face, :colors
+    TOKEN_SOURCE = "Hashaton, Scarab's Fist".freeze
+
+    attr_reader :name, :mana_cost, :oracle_text, :art_crop_url, :second_face
     attr_accessor :power, :toughness
 
     def initialize(api_card_info, power = nil, toughness = nil, art_crop_url = nil)
@@ -10,7 +12,6 @@ module Scryfall
       @name        = face["name"]
       @mana_cost   = face["mana_cost"]
       @oracle_text = face["oracle_text"]
-      @colors      = self.class.colors_of(face, api_card_info)
       type_line    = api_card_info["type_line"] || api_card_info.dig("card_faces", 0, "type_line") || ""
       @legendary   = type_line.include?("Legendary")
       @saga        = type_line.include?("Saga")
@@ -26,11 +27,13 @@ module Scryfall
       @legendary
     end
 
-    # Frame palette key: a single color, "M" for multicolor, "C" for colorless.
+    # Hashaton's copies are "a 4/4 black Zombie", whatever the original colors.
     def frame_color
-      return "C" if colors.empty?
+      "B"
+    end
 
-      colors.length == 1 ? colors.first : "M"
+    def footer
+      "TOKEN  •  #{TOKEN_SOURCE}"
     end
 
     def saga?
@@ -54,11 +57,6 @@ module Scryfall
           .gsub(/(^|\b\s)\s+($|\s?\b)/, '\\1\\2')
           .gsub(/\s+/, "_")
           .downcase
-    end
-
-    # Prepared cards keep colors per face; normal cards only at the top level.
-    def self.colors_of(face, api_card_info)
-      face["colors"] || api_card_info["colors"] || []
     end
 
     # Strip the {…} delimiters from a Scryfall mana-cost string,

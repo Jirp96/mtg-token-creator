@@ -1,18 +1,21 @@
 require_relative "vips_helpers"
 require_relative "mana_symbol_renderer"
 
-# Renders a card name (left) and its mana cost pips (right) on a transparent
-# strip, shrinking the name if it would collide with the cost.
+# Renders a card name and its mana cost pips (right) on a transparent strip,
+# shrinking the name if it would collide with the cost. With `align: :center`
+# the name is centered on the strip (token style), nudged left to clear the pips.
 class TitleSectionRenderer
   include VipsHelpers
 
   DEFAULT_GAP = 40
 
-  def initialize(width:, font_size: TITLE_FONT_SIZE, pip_diameter: TITLE_PIP_DIAMETER, gap: DEFAULT_GAP, symbols: ManaSymbolRenderer.new)
+  def initialize(width:, font_size: TITLE_FONT_SIZE, pip_diameter: TITLE_PIP_DIAMETER, gap: DEFAULT_GAP, align: :left,
+                 symbols: ManaSymbolRenderer.new)
     @width        = width
     @font         = "#{TITLE_FONT_FAMILY} #{font_size}"
     @pip_diameter = pip_diameter
     @gap          = gap
+    @align        = align
     @symbols      = symbols
   end
 
@@ -24,13 +27,19 @@ class TitleSectionRenderer
 
     height = [name_img.height, pips_img&.height || 0].max
     strip = transparent_layer(@width, height)
-    strip = strip.composite(name_img, :over, x: 0, y: vertical_center(height, name_img.height))
+    strip = strip.composite(name_img, :over, x: name_x(name_img.width, pips_x), y: vertical_center(height, name_img.height))
     return strip if pips_img.nil?
 
     strip.composite(pips_img, :over, x: pips_x, y: vertical_center(height, pips_img.height))
   end
 
   private
+
+  def name_x(name_width, pips_x)
+    return 0 unless @align == :center
+
+    [vertical_center(@width, name_width), pips_x - @gap - name_width].min.clamp(0, nil)
+  end
 
   def cost_layer(mana_cost)
     pips = ManaSymbolRenderer.parse_cost(mana_cost).map { |code| @symbols.render(code, @pip_diameter, shadow: true) }

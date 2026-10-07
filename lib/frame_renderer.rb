@@ -3,8 +3,9 @@ require "vips"
 require_relative "vips_helpers"
 
 # Draws the card chrome (colored frame, title/type bars, art window, rules-text
-# box and P/T box) as an SVG, then adds a subtle grain so it reads as print
-# rather than flat vector fills.
+# box and P/T box) as SVG, then adds a subtle grain so it reads as print rather
+# than flat vector fills. The bars come as a separate layer because they sit
+# on top of the art.
 class FrameRenderer
   include VipsHelpers
 
@@ -13,15 +14,17 @@ class FrameRenderer
   OUTLINE_WIDTH   = 7
   HIGHLIGHT_WIDTH = 5
 
-  # `palette` is one of Layout::FRAME_PALETTES.
-  def render(palette)
-    chrome = Vips::Image.svgload_buffer(svg(palette))
-    add_grain(chrome)
+  # `palette` is one of Layout::FRAME_PALETTES; `geometry` a Layout::TokenGeometry.
+  # Returns [background, bars]: composite the art between the two.
+  def render(palette, geometry)
+    [background_svg(palette, geometry), bars_svg(palette, geometry)].map do |svg|
+      add_grain(Vips::Image.svgload_buffer(svg))
+    end
   end
 
   private
 
-  def svg(palette)
+  def background_svg(palette, geometry)
     frame = palette[:frame]
     edge  = svg_color(palette[:edge])
 
@@ -36,12 +39,22 @@ class FrameRenderer
               height="#{FRAME_BOTTOM - FRAME_INSET - 8}" rx="16" fill="none"
               stroke="#{svg_color(shade(frame, 1.35))}" stroke-opacity="0.7" stroke-width="6"/>
 
-        #{window(CARD_ART_X, CARD_ART_Y, CARD_ART_WIDTH, CARD_ART_HEIGHT, "#111", edge, palette)}
-        #{window(TEXT_BOX_X, TEXT_BOX_Y, TEXT_BOX_WIDTH, TEXT_BOX_HEIGHT, "url(#box)", edge, palette)}
+        #{window(CARD_ART_X, CARD_ART_Y, CARD_ART_WIDTH, geometry.art_height, "#111", edge, palette)}
+        #{window(TEXT_BOX_X, geometry.text_box_y, TEXT_BOX_WIDTH, geometry.text_box_height, "url(#box)", edge, palette)}
 
-        #{bar(BAR_X, TITLE_BAR_Y, BAR_WIDTH, BAR_HEIGHT, edge, palette)}
-        #{bar(BAR_X, TYPE_BAR_Y, BAR_WIDTH, BAR_HEIGHT, edge, palette)}
         #{bar(PT_BOX_X, PT_BOX_Y, PT_BOX_WIDTH, PT_BOX_HEIGHT, edge, palette)}
+      </svg>
+    SVG
+  end
+
+  def bars_svg(palette, geometry)
+    edge = svg_color(palette[:edge])
+
+    <<~SVG
+      <svg xmlns="http://www.w3.org/2000/svg" width="#{CARD_WIDTH}" height="#{CARD_HEIGHT}">
+        #{defs(palette)}
+        #{bar(BAR_X, TITLE_BAR_Y, BAR_WIDTH, BAR_HEIGHT, edge, palette, opacity: TITLE_BAR_OPACITY)}
+        #{bar(BAR_X, geometry.type_bar_y, BAR_WIDTH, BAR_HEIGHT, edge, palette)}
       </svg>
     SVG
   end
@@ -81,12 +94,13 @@ class FrameRenderer
   end
 
   # A rounded "plate" with drop shadow, dark outline and an inner highlight.
-  def bar(x, y, width, height, edge, palette)
+  # `opacity` < 1 lets the art show through the fill (title bar on tokens).
+  def bar(x, y, width, height, edge, palette, opacity: 1)
     inset = OUTLINE_WIDTH + (HIGHLIGHT_WIDTH / 2.0)
     <<~SVG
       <g filter="url(#shadow)">
         <rect x="#{x}" y="#{y}" width="#{width}" height="#{height}" rx="#{BAR_RADIUS}"
-              fill="url(#bar)" stroke="#{edge}" stroke-width="#{OUTLINE_WIDTH * 2}"/>
+              fill="url(#bar)" fill-opacity="#{opacity}" stroke="#{edge}" stroke-width="#{OUTLINE_WIDTH * 2}"/>
       </g>
       <rect x="#{x + inset}" y="#{y + inset}" width="#{width - (inset * 2)}" height="#{height - (inset * 2)}"
             rx="#{BAR_RADIUS - inset}" fill="none" stroke="#{svg_color(shade(palette[:bar], 1.5))}"
@@ -106,12 +120,17 @@ class FrameRenderer
 
   # Multiply the chrome by low-frequency noise for a printed, slightly mottled look.
   def add_grain(chrome)
-    small = Vips::Image.gaussnoise(CARD_WIDTH / GRAIN_SCALE, CARD_HEIGHT / GRAIN_SCALE, sigma: 1.0, mean: 0.0, seed: 7)
-    noise = small.gaussblur(1.2).resize(GRAIN_SCALE, kernel: :linear)
-    noise = noise.embed(0, 0, CARD_WIDTH, CARD_HEIGHT, extend: :copy)
-    factor = (noise * GRAIN_STRENGTH) + 1.0
-
-    rgb = (chrome.extract_band(0, n: 3) * factor).cast(:uchar)
+    rgb = (chrome.extract_band(0, n: 3) * grain).cast(:uchar)
     rgb.bandjoin(chrome.extract_band(3)).copy(interpretation: :srgb)
+  end
+
+  # Per-pixel brightness factor around 1.0; seeded so output is reproducible.
+  def grain
+    @grain ||= begin
+      small = Vips::Image.gaussnoise(CARD_WIDTH / GRAIN_SCALE, CARD_HEIGHT / GRAIN_SCALE, sigma: 1.0, mean: 0.0, seed: 7)
+      noise = small.gaussblur(1.2).resize(GRAIN_SCALE, kernel: :linear)
+      noise = noise.embed(0, 0, CARD_WIDTH, CARD_HEIGHT, extend: :copy)
+      ((noise * GRAIN_STRENGTH) + 1.0).copy_memory
+    end
   end
 end

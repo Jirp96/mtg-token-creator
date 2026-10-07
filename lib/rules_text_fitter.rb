@@ -1,8 +1,9 @@
 require_relative "vips_helpers"
 require_relative "oracle_text_renderer"
 
-# Picks the largest oracle font size whose text fits the rules-text box, with
-# no ink running into the P/T box, and centers it vertically like printed cards.
+# Lays out rules text: picks the tallest-art geometry whose text box holds the
+# text at a comfortable size, then the largest font size that fits without ink
+# running into the P/T box, centered vertically like printed cards.
 class RulesTextFitter
   include VipsHelpers
 
@@ -11,22 +12,34 @@ class RulesTextFitter
     @renderers = {}
   end
 
-  # Returns the rendered layer and the card y at which to place it.
-  def fit(text, x, width)
-    top    = TEXT_BOX_Y + TEXT_BOX_PADDING_Y
-    height = TEXT_BOX_HEIGHT - (TEXT_BOX_PADDING_Y * 2)
-    layer = y = nil
+  # `geometries` are Layout::TokenGeometry candidates, tallest art first. Every
+  # one but the last must fit at ORACLE_PREFERRED_MIN_SIZE or larger; the last
+  # takes any size, and as a last resort the smallest even if it overflows.
+  # Returns [geometry, layer, y].
+  def fit(text, x, width, geometries)
+    layers = Hash.new { |cache, size| cache[size] = renderer(size).render(text, width) }
 
-    ORACLE_FONT_SIZES.each do |size|
-      layer = renderer(size).render(text, width)
-      y = top + [vertical_center(height, layer.height), 0].max
-      break if layer.height <= height && !hits_pt_box?(layer, x, y)
+    geometries.each_with_index do |geometry, i|
+      sizes = i == geometries.length - 1 ? ORACLE_FONT_SIZES : ORACLE_FONT_SIZES.select { it >= ORACLE_PREFERRED_MIN_SIZE }
+      sizes.each do |size|
+        y = place(layers[size], x, geometry)
+        return [geometry, layers[size], y] if y
+      end
     end
 
-    [layer, y]
+    [geometries.last, layers[ORACLE_FONT_SIZES.last], geometries.last.text_box_y + TEXT_BOX_PADDING_Y]
   end
 
   private
+
+  # The y at which `layer` sits centered in the text box, or nil if it doesn't fit.
+  def place(layer, x, geometry)
+    height = geometry.text_box_height - (TEXT_BOX_PADDING_Y * 2)
+    return nil if layer.height > height
+
+    y = geometry.text_box_y + TEXT_BOX_PADDING_Y + vertical_center(height, layer.height)
+    hits_pt_box?(layer, x, y) ? nil : y
+  end
 
   def hits_pt_box?(layer, x, y)
     left = PT_BOX_X - PT_BOX_CLEARANCE - x

@@ -21,7 +21,8 @@ module Layout
   MANA_FONT          = "NDPMTG 200"
 
   # --- Frame geometry (card pixels) -----------------------------------------
-  # Proportions follow a modern (M15) MTG frame.
+  # Proportions follow a modern (M15) token frame: the art runs from the top of
+  # the frame, under a translucent title bar, down to the type line.
   FRAME_INSET        = 95
   FRAME_BOTTOM       = 3290
   BAR_X              = 140
@@ -29,18 +30,18 @@ module Layout
   BAR_HEIGHT         = 200
   BAR_RADIUS         = 38
   TITLE_BAR_Y        = 160
-  TYPE_BAR_Y         = 1965
   BAR_TEXT_PADDING   = 55
 
+  TITLE_BAR_OPACITY  = 0.85
+
   CARD_ART_X         = 190
-  CARD_ART_Y         = 375
+  CARD_ART_Y         = 190
   CARD_ART_WIDTH     = CARD_WIDTH - (CARD_ART_X * 2)
-  CARD_ART_HEIGHT    = 1575
 
   TEXT_BOX_X         = CARD_ART_X
-  TEXT_BOX_Y         = 2180
   TEXT_BOX_WIDTH     = CARD_ART_WIDTH
-  TEXT_BOX_HEIGHT    = 1060
+  TEXT_BOX_BOTTOM    = 3240
+  TEXT_BOX_GAP       = 15
   TEXT_BOX_PADDING_X = 75
   TEXT_BOX_PADDING_Y = 60
 
@@ -50,6 +51,23 @@ module Layout
   PT_BOX_Y           = 3130
   # Gap kept between rules-text ink (or the second-face box) and the P/T box.
   PT_BOX_CLEARANCE   = 25
+
+  # Type-line positions, tallest art first. A card uses the first one whose
+  # rules text still fits at ORACLE_PREFERRED_MIN_SIZE or larger.
+  TYPE_BAR_Y_OPTIONS = [2500, 2330, 2160, 1965].freeze
+
+  # Vertical layout for one type-line position. The art reaches halfway under
+  # the type bar so the bar sits on top of it.
+  TokenGeometry = Data.define(:type_bar_y) do
+    def art_height = type_bar_y + (BAR_HEIGHT / 2) - CARD_ART_Y
+    def text_box_y = type_bar_y + BAR_HEIGHT + TEXT_BOX_GAP
+    def text_box_height = TEXT_BOX_BOTTOM - text_box_y
+  end
+
+  # --- Footer (collector-line style, on the bottom black strip) --------------
+  FOOTER_X         = BAR_X + 25
+  FOOTER_CENTER_Y  = 3350
+  FOOTER_FONT_SIZE = 64
 
   # --- Text sizes ------------------------------------------------------------
   TITLE_FONT_SIZE     = 112
@@ -61,6 +79,7 @@ module Layout
   # --- Oracle text (inline mana-symbol pipeline) -----------------------------
   # Tried largest first; the first size that fits the text box wins.
   ORACLE_FONT_SIZES                = 132.step(62, -4).to_a.freeze
+  ORACLE_PREFERRED_MIN_SIZE        = 96
   ORACLE_LINE_GAP_RATIO            = 0.12
   ORACLE_PARAGRAPH_GAP_RATIO       = 0.45
   ORACLE_SYMBOL_SCALE              = 0.82
@@ -86,6 +105,7 @@ module Layout
 
   # --- Colors (RGB, 0-255) ---------------------------------------------------
   TEXT_BLACK = [0, 0, 0].freeze
+  TEXT_WHITE = [255, 255, 255].freeze
   # Matches the outer border of card_template.png.
   BORDER_BLACK = [20, 17, 15].freeze
 

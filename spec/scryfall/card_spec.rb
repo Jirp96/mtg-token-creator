@@ -66,6 +66,18 @@ RSpec.describe Scryfall::Card do
     end
   end
 
+  describe "token identity" do
+    it "always uses the black frame, since Hashaton's copies are black Zombies" do
+      blue = described_class.new(plain_creature.merge("colors" => ["U"]))
+
+      expect(blue.frame_color).to eq("B")
+    end
+
+    it "credits Hashaton in the footer" do
+      expect(described_class.new(plain_creature).footer).to eq("TOKEN  •  Hashaton, Scarab's Fist")
+    end
+  end
+
   describe "#raw_cost" do
     it "strips the brace delimiters and preserves case" do
       card = described_class.new(plain_creature)
